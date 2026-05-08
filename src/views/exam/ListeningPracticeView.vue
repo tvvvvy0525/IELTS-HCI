@@ -1,11 +1,6 @@
 <template>
   <div class="listening-practice-view fade-in">
-    <div class="floating-controls">
-      <button class="header-btn" @click="$router.push('/exam/listening')">返回</button>
-    </div>
-
     <div class="iframe-container" v-if="iframeSrc">
-      <!-- Utilize Vite's /@fs/ local file serving capability -->
       <iframe 
         ref="iframeRef"
         :src="iframeSrc" 
@@ -23,9 +18,17 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  buildListeningHistoryTitle,
+  extractListeningSourceTitle,
+  saveExamRecord,
+} from '../../utils/examHistory.js'
+import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
+import { normalizeListeningAssetPath } from '../../utils/listeningAssetPath.js'
 
 const route = useRoute()
-const encodedPath = route.query.path
+const encodedPath = typeof route.query.path === 'string' ? route.query.path : ''
+const encodedTitle = route.query.title
 const examId = route.params.id
 
 const iframeRef = ref(null)
@@ -34,39 +37,38 @@ let currentSessionTimestamp = null // 用于标识当前练习会话，实现手
 // 保存练习记录到全局历史
 const saveToHistory = (data) => {
   try {
-    const history = JSON.parse(localStorage.getItem('exam_history') || '[]')
-    
-    // 生成标准的标题格式：Listening-P1-篇章名称
     const part = (examId && examId.toUpperCase().includes('P')) ? examId.split('-')[1].toUpperCase() : 'P1'
-    const formattedTitle = `Listening-${part}-${data.chapterTitle || data.title || 'Unknown'}`
-    
-    const newRecord = {
-      timestamp: currentSessionTimestamp || new Date().toISOString(),
+    const recordTitle = buildListeningHistoryTitle(part, encodedTitle, data.chapterTitle || data.title)
+    const sourceTitle = extractListeningSourceTitle(encodedTitle, part)
+      || extractListeningSourceTitle(data.chapterTitle || data.title, part)
+      || recordTitle
+    const sessionTimestamp = currentSessionTimestamp || new Date().toISOString()
+
+    saveExamRecord({
+      timestamp: sessionTimestamp,
       examId: examId || data.examId,
-      title: formattedTitle,
+      title: recordTitle,
       subject: 'listening',
       part: part,
       score: data.score,
       maxScore: data.maxScore,
-      durationSecs: data.durationSecs
+      durationSecs: data.durationSecs,
+      routeTarget: {
+        path: `/exam/listening/${examId || data.examId}`,
+        query: {
+          path: encodedPath,
+          title: sourceTitle,
+        },
+      },
+    })
+
+    clearDraftSession('listening', examId)
+
+    if (!currentSessionTimestamp) {
+      currentSessionTimestamp = sessionTimestamp
     }
 
-    // 设置当前会话的时间戳，后续纠正点击将使用相同的时间戳进行覆盖
-    if (!currentSessionTimestamp) {
-      currentSessionTimestamp = newRecord.timestamp
-    }
-    
-    // 查找是否存在相同会话的记录（根据时间戳和 examId）
-    const existingIndex = history.findIndex(r => r.timestamp === currentSessionTimestamp && r.examId === newRecord.examId)
-    
-    if (existingIndex !== -1) {
-      history[existingIndex] = newRecord
-    } else {
-      history.push(newRecord)
-    }
-    
-    localStorage.setItem('exam_history', JSON.stringify(history))
-    console.log("Listening history updated:", newRecord)
+    console.log("Listening history updated:", recordTitle)
   } catch (e) {
     console.error("Failed to save listening history:", e)
   }
@@ -77,10 +79,15 @@ const handleMessage = (event) => {
   if (event.data && event.data.type === 'EXAM_FINISHED') {
     saveToHistory(event.data.data)
   }
+
+  if (event.data && event.data.type === 'EXAM_DRAFT_UPDATED') {
+    persistListeningDraft(event.data.data?.title || encodedTitle)
+  }
 }
 
 onMounted(() => {
   window.addEventListener('message', handleMessage)
+  persistListeningDraft(encodedTitle)
 })
 
 onUnmounted(() => {
@@ -88,12 +95,28 @@ onUnmounted(() => {
 })
 
 const iframeSrc = computed(() => {
-  if (!encodedPath) return null
-  if (encodedPath.startsWith('/')) {
-    return `/@fs${encodedPath}`
-  }
-  return `/@fs/${encodedPath}`
+  const normalizedPath = normalizeListeningAssetPath(encodedPath)
+  return normalizedPath || null
 })
+
+function persistListeningDraft(title = '') {
+  if (!examId || !iframeSrc.value) return
+
+  saveDraftSession({
+    subject: 'listening',
+    examId,
+    title: title || encodedTitle || '未命名听力草稿',
+    updatedAt: new Date().toISOString(),
+    routeTarget: {
+      path: `/exam/listening/${examId}`,
+      query: {
+        path: iframeSrc.value,
+        title: title || encodedTitle || '',
+      },
+    },
+    draftKey: `listening_draft:${examId}`,
+  })
+}
 
 // Iframe 加载完成后注入逻辑
 const onIframeLoad = () => {
@@ -113,6 +136,38 @@ const onIframeLoad = () => {
     script.textContent = `
       (function() {
         console.log('Listening practice bridge initialized (Revised v3)');
+
+        function ensureBackButton() {
+          if (document.getElementById('codex-back-btn')) return;
+
+          const controls = document.querySelector('.header-controls');
+          if (!controls) return;
+
+          const backBtn = document.createElement('button');
+          backBtn.id = 'codex-back-btn';
+          backBtn.className = 'header-btn';
+          backBtn.type = 'button';
+          backBtn.textContent = '返回';
+          backBtn.addEventListener('click', function() {
+            window.parent.location.hash = '#/exam/listening';
+          });
+
+          controls.insertBefore(backBtn, controls.firstChild);
+        }
+
+        function notifyDraftUpdate() {
+          const h1 = document.querySelector('h1')?.textContent || '';
+          const headerH1 = document.querySelector('.header h1')?.textContent || '';
+          const rawTitle = headerH1 || h1 || document.title || '';
+          const cleanTitle = rawTitle.replace(/^Q\\d+\\s*/, '').replace(/[\\r\\n]/g, ' ').trim();
+
+          window.parent.postMessage({
+            type: 'EXAM_DRAFT_UPDATED',
+            data: {
+              title: cleanTitle
+            }
+          }, '*');
+        }
         
         // 显示一个简单的气泡提示
         function showToast(msg) {
@@ -168,6 +223,14 @@ const onIframeLoad = () => {
           }
         });
 
+        document.addEventListener('input', function() {
+          notifyDraftUpdate();
+        }, true);
+
+        document.addEventListener('change', function() {
+          notifyDraftUpdate();
+        }, true);
+
         // 监听手动纠正点击
         document.addEventListener('click', function(e) {
           const row = e.target.closest('tr');
@@ -210,6 +273,7 @@ const onIframeLoad = () => {
 
         const style = document.createElement('style');
         style.textContent = \`
+          .header-controls { align-items: center; }
           .results-table tr { cursor: pointer !important; user-select: none; }
           .results-table tr:hover { background: rgba(124, 58, 237, 0.08) !important; }
           .results-table::after {
@@ -218,6 +282,8 @@ const onIframeLoad = () => {
           }
         \`;
         document.head.appendChild(style);
+        ensureBackButton();
+        notifyDraftUpdate();
       })();
     `;
     doc.body.appendChild(script)
@@ -237,60 +303,10 @@ const onIframeLoad = () => {
   font-family: "SF Pro Text", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
 }
 
-.floating-controls {
-  position: fixed;
-  top: 14px;
-  right: 18px;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border: 1px solid rgba(226, 224, 238, 0.92);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(14px);
-}
-
-.header-content h1 {
-  font-size: 1.1em;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text);
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
-.header-content p {
-  font-size: 0.92em;
-  margin: 0;
-  color: var(--text-muted, #8b87a6);
-}
-
-.header-controls {
-  display: flex;
-  gap: 12px;
-}
-
-.header-btn {
-  border: 1px solid var(--border, #e3e0ee);
-  background: transparent;
-  color: var(--text);
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.header-btn:hover {
-  background: var(--row-hover, #fdfcff);
-}
-
 .iframe-container {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 

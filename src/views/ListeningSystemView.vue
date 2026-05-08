@@ -14,6 +14,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ExamCatalog from '../components/ExamCatalog.vue'
+import { normalizeListeningAssetPath } from '../utils/listeningAssetPath.js'
 
 const router = useRouter()
 const listeningItems = ref([])
@@ -25,7 +26,7 @@ onMounted(async () => {
     examId: item.examId,
     title: item.title,
     category: item.category,
-    path: item.path,
+    path: normalizeListeningAssetPath(item.path),
   }))
 })
 

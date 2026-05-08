@@ -42,6 +42,43 @@
       </div>
     </footer>
 
+    <section v-if="isSubmitted" class="explanation-panel">
+      <div class="explanation-card">
+        <div class="explanation-header">
+          <div>
+            <h3>错题解析</h3>
+            <p>提交后可按题号查看对应答案解释。</p>
+          </div>
+        </div>
+
+        <div v-if="incorrectQuestionIds.length" class="explanation-body">
+          <div class="explanation-tabs">
+            <button
+              v-for="qId in incorrectQuestionIds"
+              :key="qId"
+              class="explanation-tab"
+              :class="{ active: activeExplanationQuestionId === qId }"
+              type="button"
+              @click="activeExplanationQuestionId = qId"
+            >
+              第 {{ examData?.questionDisplayMap?.[qId] || qId.replace('q', '') }} 题
+            </button>
+          </div>
+
+          <div v-if="activeExplanation" class="explanation-content">
+            <pre>{{ activeExplanation.text }}</pre>
+          </div>
+          <div v-else class="explanation-empty">
+            当前题目暂未接入解析数据。
+          </div>
+        </div>
+
+        <div v-else class="explanation-empty">
+          本次全部答对，暂无错题解析。
+        </div>
+      </div>
+    </section>
+
     <!-- Selection Bar -->
     <div class="selbar" v-show="selbarVisible" :style="selbarStyle" @mousedown.prevent>
       <button @click="doHighlight">Highlight</button>
@@ -70,8 +107,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { saveExamRecord } from '../../utils/examHistory.js'
+import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
+import {
+  clearReadingAnnotationState,
+  getReadingAnnotationState,
+  saveReadingAnnotationState,
+} from '../../utils/readingAnnotations.js'
+import {
+  clearReadingDraftState,
+  getReadingDraftState,
+  saveReadingDraftState,
+} from '../../utils/readingDraftState.js'
+import { isReadingAnswerCorrect } from '../../utils/readingAnswer.js'
+import { findReadingExplanation } from '../../utils/readingExplanations.js'
 
 const route = useRoute()
 const examId = route.params.id
@@ -93,6 +144,8 @@ const activeHlNode = ref(null)
 const answeredMap = ref({})
 const gradingResult = ref({})
 const isSubmitted = ref(false)
+const explanationData = ref(null)
+const activeExplanationQuestionId = ref(null)
 
 // Timer State
 const elapsedSeconds = ref(0)
@@ -103,6 +156,36 @@ const formattedTime = computed(() => {
   const s = elapsedSeconds.value % 60
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 })
+
+const incorrectQuestionIds = computed(() => (
+  examData.value?.questionOrder?.filter((qId) => gradingResult.value[qId] === false) || []
+))
+
+const activeExplanation = computed(() => (
+  activeExplanationQuestionId.value
+    ? findReadingExplanation(explanationData.value, activeExplanationQuestionId.value)
+    : null
+))
+
+function loadReadingExplanationScript() {
+  return new Promise((resolve) => {
+    const scriptId = `reading-explanation-${examId}`
+    if (document.getElementById(scriptId)) {
+      resolve()
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = scriptId
+    script.src = `/generated/reading-explanations/${examId}.js`
+    script.onload = () => resolve()
+    script.onerror = () => {
+      console.warn('Reading explanation not found for exam:', examId)
+      resolve()
+    }
+    document.head.appendChild(script)
+  })
+}
 
 const startTimer = () => {
   if (timerInterval) return
@@ -141,6 +224,7 @@ const updateAnsweredStatus = () => {
     }
     answeredMap.value[qId] = hasAns;
   }
+  persistReadingDraft();
 }
 
 onMounted(async () => {
@@ -152,17 +236,114 @@ onMounted(async () => {
       }
     }
   }
+  window.__READING_EXPLANATION_DATA__ = {
+    register: (id, payload) => {
+      if (id === examId) {
+        explanationData.value = payload
+      }
+    },
+  }
 
   try {
     // Dynamic import matching legacy structure
     await import(`../../../generated/reading-exams/${examId}.js`)
+    await loadReadingExplanationScript()
     loaded.value = true
+    await nextTick()
+    restoreReadingAnnotations()
+    updateAnsweredStatus()
     startTimer()
   } catch (e) {
     console.error("Failed to load exam data", e)
     alert("无法加载题目：" + examId)
   }
 })
+
+function getPaneState() {
+  return {
+    leftPaneHtml: document.getElementById('left')?.innerHTML || '',
+    rightPaneHtml: document.getElementById('right')?.innerHTML || '',
+    notesStore: { ...notesStore.value },
+  }
+}
+
+function getReadingDraftSnapshot() {
+  const textAnswers = {}
+  const radioAnswers = {}
+
+  document.querySelectorAll('#right input[type="text"]').forEach((input) => {
+    if (input.name) {
+      textAnswers[input.name] = input.value
+    }
+  })
+
+  document.querySelectorAll('#right input[type="radio"]:checked').forEach((input) => {
+    if (input.name) {
+      radioAnswers[input.name] = input.value
+    }
+  })
+
+  return {
+    ...getPaneState(),
+    textAnswers,
+    radioAnswers,
+    elapsedSeconds: elapsedSeconds.value,
+    isSubmitted: isSubmitted.value,
+    gradingResult: { ...gradingResult.value },
+    answeredMap: { ...answeredMap.value },
+  }
+}
+
+function persistReadingDraft() {
+  saveReadingDraftState(examId, getReadingDraftSnapshot())
+  saveDraftSession({
+    subject: 'reading',
+    examId,
+    title: examData.value?.meta?.title || '未命名阅读草稿',
+    updatedAt: new Date().toISOString(),
+    routeTarget: {
+      path: `/exam/reading/${examId}`,
+    },
+    draftKey: `reading_draft:${examId}`,
+  })
+}
+
+function persistReadingAnnotations() {
+  saveReadingAnnotationState(examId, getPaneState())
+  persistReadingDraft()
+}
+
+function restoreReadingAnnotations() {
+  const savedDraft = getReadingDraftState(examId)
+  const savedState = getReadingAnnotationState(examId)
+  const leftPane = document.getElementById('left')
+  const rightPane = document.getElementById('right')
+
+  notesStore.value = { ...savedState.notesStore, ...savedDraft.notesStore }
+
+  if (leftPane && (savedDraft.leftPaneHtml || savedState.leftPaneHtml)) {
+    leftPane.innerHTML = savedDraft.leftPaneHtml || savedState.leftPaneHtml
+  }
+
+  if (rightPane && (savedDraft.rightPaneHtml || savedState.rightPaneHtml)) {
+    rightPane.innerHTML = savedDraft.rightPaneHtml || savedState.rightPaneHtml
+  }
+
+  Object.entries(savedDraft.textAnswers).forEach(([name, value]) => {
+    const input = document.querySelector(`#right input[name="${name}"]`)
+    if (input) input.value = value
+  })
+
+  Object.entries(savedDraft.radioAnswers).forEach(([name, value]) => {
+    const input = document.querySelector(`#right input[name="${name}"][value="${value}"]`)
+    if (input) input.checked = true
+  })
+
+  elapsedSeconds.value = savedDraft.elapsedSeconds || 0
+  isSubmitted.value = savedDraft.isSubmitted || false
+  gradingResult.value = { ...savedDraft.gradingResult }
+  answeredMap.value = { ...savedDraft.answeredMap }
+}
 
 // === Annotation Logic ===
 
@@ -266,6 +447,7 @@ const doHighlight = () => {
       activeRange.value.surroundContents(mark)
       window.getSelection().removeAllRanges()
       selbarVisible.value = false
+      persistReadingAnnotations()
       return mark
     } catch(e) {
       alert("⚠️ 无法跨段落应用高亮，请在单一文本段落内划选。")
@@ -281,6 +463,7 @@ const doRemove = () => {
     activeHlNode.value.replaceWith(text)
     activeHlNode.value = null
     selbarVisible.value = false
+    persistReadingAnnotations()
   } else if (activeRange.value) {
     selbarVisible.value = false
   }
@@ -312,6 +495,8 @@ const saveNote = () => {
       el.classList.remove('has-note')
     }
   }
+
+  persistReadingAnnotations()
 }
 
 const closeNote = () => {
@@ -343,7 +528,7 @@ const submitExam = () => {
       }
     }
 
-    const isCorrect = String(userAns || '').trim().toLowerCase() === String(correctAns).trim().toLowerCase()
+    const isCorrect = isReadingAnswerCorrect(userAns, correctAns)
     gradingResult.value[qId] = userAns ? isCorrect : false;
 
     if (isCorrect) correctCount++;
@@ -357,10 +542,8 @@ const submitExam = () => {
   isSubmitted.value = true;
   stopTimer();
 
-  // Save to history
   try {
-    const history = JSON.parse(localStorage.getItem('exam_history') || '[]');
-    const newRecord = {
+    saveExamRecord({
       timestamp: new Date().toISOString(),
       examId: examId,
       title: examData.value.meta?.title || '未命名练习',
@@ -368,15 +551,18 @@ const submitExam = () => {
       part: examData.value.meta?.category || 'P1',
       score: correctCount,
       maxScore: examData.value.questionOrder.length,
-      durationSecs: elapsedSeconds.value
-    };
-    history.push(newRecord);
-    localStorage.setItem('exam_history', JSON.stringify(history));
+      durationSecs: elapsedSeconds.value,
+      routeTarget: {
+        path: `/exam/reading/${examId}`,
+      },
+    });
+    clearDraftSession('reading', examId)
   } catch (e) {
     console.error("Failed to save exam history", e);
   }
 
   alert(`批改完成！用时: ${formattedTime.value}，正确率: ${correctCount} / ${examData.value.questionOrder.length}`);
+  activeExplanationQuestionId.value = incorrectQuestionIds.value[0] || null
 }
 
 const resetExam = () => {
@@ -384,8 +570,13 @@ const resetExam = () => {
   isSubmitted.value = false;
   gradingResult.value = {};
   answeredMap.value = {};
+  notesStore.value = {};
   elapsedSeconds.value = 0;
   loaded.value = false;
+  clearReadingAnnotationState(examId)
+  clearReadingDraftState(examId)
+  clearDraftSession('reading', examId)
+  activeExplanationQuestionId.value = null
   stopTimer();
   setTimeout(() => { 
     loaded.value = true; 
@@ -632,6 +823,85 @@ const scrollToQuestion = (qId) => {
   background: var(--accent, #7c3aed);
   color: white;
   border: none;
+}
+
+.explanation-panel {
+  padding: 0 24px 20px;
+  background: var(--bg, #f7f6fa);
+}
+
+.explanation-card {
+  border: 1px solid var(--border, #e3e0ee);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.explanation-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border, #e3e0ee);
+}
+
+.explanation-header h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.explanation-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.explanation-body {
+  padding: 16px 20px 20px;
+}
+
+.explanation-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.explanation-tab {
+  border: 1px solid var(--border, #e3e0ee);
+  background: var(--bg, #f7f6fa);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.explanation-tab.active {
+  background: var(--accent, #7c3aed);
+  border-color: var(--accent, #7c3aed);
+  color: white;
+}
+
+.explanation-content {
+  border: 1px solid var(--border, #e3e0ee);
+  background: var(--bg, #f7f6fa);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.explanation-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.explanation-empty {
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
 }
 
 /* === Annotation UI === */

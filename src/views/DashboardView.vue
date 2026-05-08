@@ -1,20 +1,21 @@
 <template>
   <div class="dashboard-view">
-    <!-- Welcome banner -->
     <section class="page-intro card">
       <div>
         <p class="eyebrow">今日概览</p>
         <h2>完成今日练习，持续积累实力。</h2>
+        <p class="dashboard-subtitle">
+          {{ recentSummary }}
+        </p>
       </div>
-      <button class="primary-btn" type="button">
+      <button class="primary-btn" type="button" @click="startPractice">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
-        开始练习
+        {{ stats.latestDraft ? '继续未完成练习' : (stats.recentRecords.length ? '打开最近练习' : '开始练习') }}
       </button>
     </section>
 
-    <!-- Stat cards -->
     <div class="summary-cards">
       <div class="card stat-card">
         <div class="stat-header">
@@ -71,23 +72,22 @@
       </div>
     </div>
 
-    <!-- Subject progress -->
     <div class="main-stats">
       <SubjectProgress
         subject="reading"
         title="阅读专项"
-        :duration="0"
-        :accuracy="0"
-        :count="0"
-        :parts="['P1: 0%', 'P2: 0%', 'P3: 0%']"
+        :duration="readingStats.duration"
+        :accuracy="readingStats.accuracy"
+        :count="readingStats.count"
+        :parts="readingStats.parts"
       />
       <SubjectProgress
         subject="listening"
         title="听力专项"
-        :duration="0"
-        :accuracy="0"
-        :count="0"
-        :parts="['P1: 0%', 'P2: 0%', 'P3: 0%', 'P4: 0%']"
+        :duration="listeningStats.duration"
+        :accuracy="listeningStats.accuracy"
+        :count="listeningStats.count"
+        :parts="listeningStats.parts"
       />
       <SubjectProgress
         subject="writing"
@@ -110,14 +110,98 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { computed, onMounted, onUnmounted, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import SubjectProgress from '../components/SubjectProgress.vue'
+import { resolveRouteFromRecord } from '../utils/examNavigation.js'
+import {
+  EXAM_DRAFTS_UPDATED_EVENT,
+  getLatestDraftSession,
+} from '../utils/examDrafts.js'
+import {
+  EXAM_HISTORY_UPDATED_EVENT,
+  getExamStats,
+  getSubjectStats,
+} from '../utils/examHistory.js'
 
-// TODO: 从 localStorage 读取真实数据
+const router = useRouter()
+
 const stats = reactive({
   totalSessions: 0,
   avgAccuracy: 0,
   totalMinutes: 0,
   streak: 0,
+  recentRecords: [],
+  latestDraft: null,
+})
+
+const readingStats = reactive({
+  duration: 0,
+  accuracy: 0,
+  count: 0,
+  parts: ['P1: 0%', 'P2: 0%', 'P3: 0%'],
+})
+
+const listeningStats = reactive({
+  duration: 0,
+  accuracy: 0,
+  count: 0,
+  parts: ['P1: 0%', 'P2: 0%', 'P3: 0%', 'P4: 0%'],
+})
+
+const recentSummary = computed(() => {
+  if (stats.latestDraft) {
+    return `有未完成练习：${stats.latestDraft.title}，可继续上次进度。`
+  }
+
+  const recentRecord = stats.recentRecords[0]
+  if (!recentRecord) {
+    return '当前还没有练习记录，先从一套阅读题开始。'
+  }
+
+  return `最近完成：${recentRecord.title}，正确率 ${recentRecord.accuracy}%。`
+})
+
+function refreshDashboard() {
+  Object.assign(stats, getExamStats())
+  Object.assign(readingStats, getSubjectStats('reading'))
+  Object.assign(listeningStats, getSubjectStats('listening'))
+  stats.latestDraft = getLatestDraftSession()
+}
+
+async function startPractice() {
+  if (stats.latestDraft?.routeTarget?.path) {
+    router.push(stats.latestDraft.routeTarget)
+    return
+  }
+
+  const recentRecord = stats.recentRecords[0]
+  if (recentRecord) {
+    router.push(await resolveRouteFromRecord(recentRecord))
+    return
+  }
+
+  router.push('/exam/reading')
+}
+
+onMounted(() => {
+  refreshDashboard()
+  window.addEventListener('storage', refreshDashboard)
+  window.addEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshDashboard)
+  window.addEventListener(EXAM_DRAFTS_UPDATED_EVENT, refreshDashboard)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', refreshDashboard)
+  window.removeEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshDashboard)
+  window.removeEventListener(EXAM_DRAFTS_UPDATED_EVENT, refreshDashboard)
 })
 </script>
+
+<style scoped>
+.dashboard-subtitle {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+</style>
