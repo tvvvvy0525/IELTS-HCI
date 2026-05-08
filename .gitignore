@@ -5,6 +5,7 @@ dist/
 
 .claude/
 .omx/
+.serena/
 temp/
 
 npm-debug.log*
