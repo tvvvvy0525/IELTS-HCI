@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">History</p>
         <h2>练习记录</h2>
-        <p>查看最近完成的阅读和听力练习，并从记录中快速回到对应卷面。</p>
+        <p>查看最近完成的阅读、听力和写作练习，并从记录中快速回到对应练习。</p>
       </div>
       <div class="catalog-count">
         <strong>{{ records.length }}</strong>
@@ -126,6 +126,7 @@ const filters = [
   { value: 'all', label: '全部' },
   { value: 'reading', label: '阅读' },
   { value: 'listening', label: '听力' },
+  { value: 'writing', label: '写作' },
 ]
 
 const filteredRecords = computed(() => {

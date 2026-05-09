@@ -13,6 +13,13 @@ function fallbackRoute(subject, examId = '') {
     }
   }
 
+  if (subject === 'writing') {
+    return {
+      path: '/exam/writing',
+      query: examId ? { practiceId: examId } : undefined,
+    }
+  }
+
   return {
     path: '/exam/dashboard',
   }
@@ -77,6 +84,16 @@ export function buildRouteFromRecord(record) {
 
   if (record?.subject === 'reading') {
     return buildReadingRoute(record)
+  }
+
+  if (record?.subject === 'writing') {
+    if (record?.routeTarget?.path) {
+      return {
+        path: record.routeTarget.path,
+        query: record.routeTarget.query ? { ...record.routeTarget.query } : undefined,
+      }
+    }
+    return fallbackRoute('writing', record?.examId)
   }
 
   return {
