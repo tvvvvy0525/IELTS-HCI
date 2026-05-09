@@ -106,6 +106,19 @@
         :parts="['Part 1 待练习', 'Part 2 待练习', 'Part 3 待练习']"
       />
     </div>
+
+    <section class="card vocabulary-entry-card">
+      <div>
+        <p class="eyebrow">Vocabulary</p>
+        <h2>词汇系统入口已就绪</h2>
+        <p class="dashboard-subtitle">
+          词汇模块的独立路由和页面骨架已经接入，后续可以直接在该入口下扩展词库、单词详情、今日复习和四科联动。
+        </p>
+      </div>
+      <button class="ghost-btn" type="button" @click="openVocabulary">
+        打开词汇系统
+      </button>
+    </section>
   </div>
 </template>
 
@@ -184,6 +197,10 @@ async function startPractice() {
   router.push('/exam/reading')
 }
 
+function openVocabulary() {
+  router.push('/exam/vocabulary')
+}
+
 onMounted(() => {
   refreshDashboard()
   window.addEventListener('storage', refreshDashboard)
@@ -203,5 +220,28 @@ onUnmounted(() => {
   margin-top: 6px;
   color: var(--text-secondary);
   line-height: 1.6;
+}
+
+.vocabulary-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+}
+
+.vocabulary-entry-card h2 {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 900px) {
+  .vocabulary-entry-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

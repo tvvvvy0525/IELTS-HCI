@@ -74,6 +74,16 @@
           口语练习
         </RouterLink>
 
+        <RouterLink to="/exam/vocabulary" class="nav-item" data-subject="vocabulary">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </span>
+          词汇系统
+        </RouterLink>
+
         <span class="nav-section-label" style="margin-top: 6px;">数据 & 工具</span>
 
         <RouterLink to="/exam/history" class="nav-item">
@@ -154,6 +164,7 @@ const routeTitleMap = {
   'exam-reading-practice': '阅读练习',
   'exam-listening': '听力练习',
   'exam-listening-practice': '听力练习',
+  'exam-vocabulary': '词汇系统',
   'exam-writing': '写作练习',
   'exam-speaking': '口语练习',
   'exam-history': '练习记录',

@@ -6,7 +6,9 @@ import ListeningSystemView from './views/ListeningSystemView.vue'
 import ReadingPracticeView from './views/exam/PracticeView.vue'
 import ListeningPracticeView from './views/exam/ListeningPracticeView.vue'
 import WritingSystemView from './views/WritingSystemView.vue'
+import WritingFeedbackView from './views/WritingFeedbackView.vue'
 import SpeakingSystemView from './views/SpeakingSystemView.vue'
+import VocabularySystemView from './views/VocabularySystemView.vue'
 import HistoryView from './views/HistoryView.vue'
 import ToolsView from './views/ToolsView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -36,7 +38,9 @@ const router = createRouter({
         { path: 'dashboard', name: 'exam-dashboard', component: DashboardView },
         { path: 'reading', name: 'exam-reading', component: ReadingSystemView },
         { path: 'listening', name: 'exam-listening', component: ListeningSystemView },
+        { path: 'vocabulary', name: 'exam-vocabulary', component: VocabularySystemView },
         { path: 'writing', name: 'exam-writing', component: WritingSystemView },
+        { path: 'writing/feedback', name: 'exam-writing-feedback', component: WritingFeedbackView },
         { path: 'speaking', name: 'exam-speaking', component: SpeakingSystemView },
         { path: 'history', name: 'exam-history', component: HistoryView },
         { path: 'tools', name: 'exam-tools', component: ToolsView },
