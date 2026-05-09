@@ -165,6 +165,57 @@
   - `plan/findings.md`
   - `plan/progress.md`
 
+## 会话：2026-05-08（大功能优先级梳理）
+
+### 阶段 1：优先级整理
+- **状态：** complete
+- 执行的操作：
+  - 依据 `plan/开发进度统计.md` 和已完成里程碑，重新区分“大功能开发”和“闭环完善”
+  - 记录下一阶段的大功能优先级排序
+  - 记录闭环完善尚未完成项
+- 创建/修改的文件：
+  - `plan/task_plan.md`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
+## 会话：2026-05-08（Milestone 4 实施）
+
+### 阶段 1：Writing 资源盘点
+- **状态：** complete
+- 执行的操作：
+  - 确认当前仓库无正式 Writing 题库资源
+  - 对照 `Word` 项目，确认可迁移的 WritingPractice 编辑器和数据层
+- 创建/修改的文件：
+  - `plan/task_plan.md`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
+### 阶段 2：Writing MVP 落地
+- **状态：** complete
+- 执行的操作：
+  - 新增 `src/utils/writingPractice.js`
+  - 新增 `tests/writing-practice.test.js`
+  - 将 `src/views/WritingSystemView.vue` 从占位页替换为真正的写作编辑器
+  - 补写作记录回流与 History 最小支持
+- 创建/修改的文件：
+  - `src/utils/writingPractice.js`
+  - `tests/writing-practice.test.js`
+  - `src/views/WritingSystemView.vue`
+  - `src/utils/examNavigation.js`
+  - `src/views/HistoryView.vue`
+  - `plan/Milestone4-WritingMVP任务拆解.md`
+
+### 阶段 3：Milestone 4 验证
+- **状态：** complete
+- 执行的操作：
+  - 运行写作与既有全部 Node 测试
+  - 运行 `npm run build`
+  - 回写本轮计划与发现
+- 创建/修改的文件：
+  - `plan/task_plan.md`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
 ## 测试结果
 | 测试 | 输入 | 预期结果 | 实际结果 | 状态 |
 |------|------|---------|---------|------|
@@ -184,12 +235,67 @@
 |--------|------|---------|---------|
 | 2026-05-08 | 无 | 1 | 当前为规划阶段 |
 
+## 会话：2026-05-09（Milestone 5 规划）
+
+### 阶段 1：词汇系统需求收敛
+- **状态：** complete
+- 执行的操作：
+  - 阅读 `HCI-product-doc.md` 中与词汇系统相关的目标、痛点和信息架构
+  - 对齐用户提出的“20 词闪卡 + 不认识回池 + 可扩展词库 + 双向关系”方案
+  - 确认本轮先做规划，不改业务代码
+- 创建/修改的文件：
+  - `plan/Milestone5-词汇系统任务拆解.md`
+  - `plan/findings.md`
+  - `plan/task_plan.md`
+  - `plan/progress.md`
+
+### 阶段 2：资源与骨架盘点
+- **状态：** complete
+- 执行的操作：
+  - 检查当前 `src/router.js` 与 `src/views/ExamLayout.vue`，确认仓库内还没有词汇模块入口
+  - 统计外部 `vocabulary.js` 资源规模，确认约 22 个主题、980 个词组、3674 个词条
+  - 结合当前 Vue 3 + `src/utils/*` 结构，确定首版采用轻量数据服务层而非额外引入复杂 store 框架
+- 创建/修改的文件：
+  - `plan/Milestone5-词汇系统任务拆解.md`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
+### 阶段 3：Milestone 5 拆解成稿
+- **状态：** complete
+- 执行的操作：
+  - 输出词汇系统本轮目标、范围、任务拆解、关键取舍、实施顺序与验收标准
+  - 根据用户补充要求，将原“轻量闭环”方案升级为“完整词汇系统规划”
+  - 扩充到词库、关系、复习、统计、Dashboard 和四科联动接口预埋
+- 创建/修改的文件：
+  - `plan/Milestone5-词汇系统任务拆解.md`
+  - `plan/findings.md`
+  - `plan/task_plan.md`
+  - `plan/progress.md`
+
+### 阶段 4：词汇系统入口级接入
+- **状态：** complete
+- 执行的操作：
+  - 新增词汇系统占位入口页 `src/views/VocabularySystemView.vue`
+  - 在 `src/router.js` 中接入 `/exam/vocabulary` 路由
+  - 在 `src/views/ExamLayout.vue` 左侧导航中加入“词汇系统”
+  - 在 `src/views/DashboardView.vue` 中加入词汇系统入口卡片
+  - 在 `src/style.css` 中补充词汇入口的激活态和入口页配色
+  - 运行 `npm run build` 验证通过
+- 创建/修改的文件：
+  - `src/views/VocabularySystemView.vue`
+  - `src/router.js`
+  - `src/views/ExamLayout.vue`
+  - `src/views/DashboardView.vue`
+  - `src/style.css`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
 ## 五问重启检查
 | 问题 | 答案 |
 |------|------|
-| 我在哪里？ | Milestone 3 已完成，等待下一里程碑 |
-| 我要去哪里？ | 规划并实施下一轮体验优化 |
-| 目标是什么？ | 在保持现有稳定性的前提下继续补学习体验闭环 |
+| 我在哪里？ | Milestone 4 已完成，Milestone 5 完整规划已产出 |
+| 我要去哪里？ | 等待确认后进入词汇系统完整实现阶段 |
+| 目标是什么？ | 用现有词汇资源落地一个完整且可协作分工的词汇系统 |
 | 我学到了什么？ | 见 `plan/findings.md` |
 | 我做了什么？ | 见上方记录 |
 

@@ -39,8 +39,9 @@
 - **状态：** complete
 
 ## 关键问题
-1. Reading 草稿恢复是否继续补到“完整断点续做”级别。
-2. History 页面是否进入“导出 / 删除 / 清空”的产品化整理。
+1. 是否按 `Milestone 5` 启动词汇系统完整版本。
+2. 词汇学习状态是否采用 `new / learning / known` 三态。
+3. 是否继续把关系系统控制在双向同步，而不扩到闭包图推导。
 
 ## 已做决策
 | 决策 | 理由 |
@@ -54,6 +55,8 @@
 | Milestone 2 先做 Listening 运行时路径规范化 | 比直接重写生成物链路更小、更稳、更适合当前仓库状态 |
 | Milestone 2 保留 iframe + bridge 模式，只移除 `/@fs/` 和绝对路径依赖 | 当前最短路径是先解决部署问题，而不是重写 Listening UI 形态 |
 | Milestone 3 先聚焦 Reading 判分容错和批注持久化 | 这是当前体验收益最高、实现风险最低的一组改进 |
+| 下一阶段按“大功能优先级”应先做 Writing，再做 Speaking | 两者都是产品定义中的核心模块，且当前都几乎为空白 |
+| 在缺少正式题库资源时，Writing 先做编辑器 MVP | 先让模块可用，再补资源层与反馈层，比继续等待题库更高效 |
 
 ## 遇到的错误
 | 错误 | 尝试次数 | 解决方案 |
@@ -69,3 +72,8 @@
 - Milestone 2 已完成。
 - Milestone 3 拆解详见 `plan/Milestone3-Reading体验补齐任务拆解.md`。
 - Milestone 3 已完成。
+- 已补充“大功能优先级”和“闭环完善未完成项”记录，供下一阶段排期使用。
+- Milestone 4 拆解详见 `plan/Milestone4-WritingMVP任务拆解.md`。
+- Milestone 4 已完成基础编辑器落地。
+- Milestone 5 拆解详见 `plan/Milestone5-词汇系统任务拆解.md`。
+- 当前建议下一里程碑优先进入词汇系统完整版本，而不是继续扩写作反馈。

@@ -1,14 +1,15 @@
 # IELTS-HCI
 
-免费开源的 IELTS 备考练习网站，基于 Vue 3 和 Vite 构建，当前重点支持 Reading 与 Listening 题库练习。
+免费开源的 IELTS 备考练习网站，基于 Vue 3 和 Vite 构建，当前重点支持 Reading、Listening 与 Writing MVP 练习。
 
 ## 功能状态
 
 - Reading 系统：支持题库浏览、练习页、计时、答题状态、拖拽题、提交批改、深色模式、Highlight 和 Note。
 - Listening 系统：支持按 Part 浏览听力题库，并通过 iframe 加载原始练习页面、同步成绩记录。
-- Dashboard：已有学习概览 UI，后续需要接入真实练习数据。
-- History：阅读和听力练习会写入 localStorage，后续需要完善记录展示页面。
-- Writing / Speaking：当前为占位页面，待接入练习、评分和反馈流程。
+- Dashboard：已接入 Reading / Listening 真实练习统计，Writing 统计仍待补齐。
+- History：阅读、听力、写作练习会写入 localStorage，并支持从记录回到对应练习。
+- Writing 系统：支持 Task 1 / Task 2 练笔、计时、分段写作、草稿保存、提交，以及手动评分 / AI JSON 粘贴反馈。
+- Speaking：当前仍为占位页面，待接入口语练习、录音与反馈流程。
 - Tools / Settings：当前为静态 UI，待实现计时器、Band 换算、备考计划和配置持久化。
 
 ## 技术栈

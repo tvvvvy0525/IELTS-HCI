@@ -4,7 +4,7 @@
 - 使用 skill 规范 `Ielts-HCI` 的产品开发流程。
 - 输出可持续维护的规划文件，而不是一次性口头建议。
 - 当前先做流程和计划，不直接修改业务代码。
-- 当前新增需求：进入 `Milestone 2`，规划 Listening 可部署化。
+- 当前新增需求：规划 `Milestone 5`，用现有词汇资源落地词汇系统完整版本，而不是只做 MVP。
 
 ## 研究发现
 - 项目已经完成 Vue 3 + Vite 基础壳，以及 Reading / Listening 的主要练习流程。
@@ -35,6 +35,30 @@
 - 实施后，Reading 已通过 `src/utils/readingAnnotations.js` 按 `examId` 持久化高亮与笔记。
 - 实施后，Reading 已接入错题解析入口，提交后可按错题题号查看 explanation 数据。
 - Reading 草稿恢复已经有基础草稿会话，但是否恢复到“完整作答现场 + 已提交状态”仍应作为后续跟进项。
+- 如果按“大功能”优先级排，当前最值得进入开发的是：
+  - `Writing MVP`
+  - `Speaking MVP`
+  - `Vocabulary / 词汇系统主入口整合`
+- 如果按“闭环完善”优先级排，当前仍未完成的主要部分是：
+  - Reading 草稿完整恢复
+  - Listening 草稿完整恢复
+  - History 导出 / 单条删除 / 批量清空
+  - Dashboard 与 History 的更强联动（最近草稿、最近错题、继续入口精细化）
+- Reading 解析区与原题定位联动
+- 当前确认：仓库里没有正式 Writing 题库资源，因此 `Writing` 不能直接走“真题系统”路线。
+- `/Users/tiffany/code/Word` 中已有可迁移的 WritingPractice 数据层与编辑器结构，适合先迁入作为 MVP。
+- 实施后，`WritingSystemView.vue` 已从占位页升级为可用编辑器，支持 Task 切换、计时、草稿、本地历史和提交。
+- 实施后，Writing 提交已写入 `exam_history`，并支持从 History 回到对应练笔。
+- 产品文档已把词汇系统定义为正式模块，目标包含“个人词库 · 间隔复习 · 词族地图”，而不是工具页附属能力。
+- 产品文档对词汇系统的首要痛点定义非常集中：P3 词汇孤立、P4 遗忘时机不明、P5 复习任务滚雪球。
+- 当前仓库里还没有词汇模块入口；`src/router.js` 和 `src/views/ExamLayout.vue` 仍是四科 + history/tools/settings 的结构。
+- 外部词汇资源 `/Users/tiffany/code/my-ielts/src/pages/vocabulary/vocabulary.js` 可直接复用，当前规模约为 22 个主题、980 个词组、3674 个词条。
+- 这份词汇资源已经包含主题、词性、释义、例句和补充说明，足够支撑首版词库列表和闪卡复习，不必先补外部 API。
+- 如果按用户最新要求，Milestone 5 不应只规划成“轻量闭环”，而应覆盖词库、复习、关系、统计和联动接口的完整产品面。
+- 即使继续强调“防积压”，完整版词汇系统的数据层也更适合保留 `new / learning / known` 三态，而不是把系统能力永久锁死在两态模型。
+- 当前已完成词汇系统入口级接入：新增 `/exam/vocabulary` 路由、左侧导航入口、Dashboard 入口卡片，以及一个可供后续继续开发的占位骨架页。
+- 这次代码改动仍未触及词库数据层和复习逻辑，后续可以直接在新入口页和新路由下扩展功能，而不需要先改产品壳。
+- 当前更合适的关系策略是“同义词 / 衍生词双向同步”，暂不引入图闭包；这样足以满足“如果两个词都在词库里则双边显示”的要求。
 
 ## 技术决策
 | 决策 | 理由 |
@@ -47,6 +71,12 @@
 | Milestone 2 优先做运行时路径转换层，而不是先改 manifest 生成源头 | 能更快移除 `/@fs/` 依赖，并兼容现有历史数据 |
 | Listening 路径转换层需要同时服务 manifest、练习页 query、历史记录 normalize 和路由回流 | 否则旧数据和新入口会出现路径格式不一致 |
 | Reading 批注持久化先采用 `examId -> pane HTML + notesStore` 的本地方案 | 相比结构化 annotation model，改动更小，更适合当前 legacy DOM 形态 |
+| 大功能排期优先级应以“产品空白度 × 用户价值 × 与现有壳兼容度”综合排序 | 避免继续被细碎闭环改动拖住主线功能建设 |
+| Writing 在无题库时先做编辑器 MVP，再补资源层和反馈层 | 这样能最短路径把模块从 15% 拉到可用状态 |
+| Milestone 5 改为“完整词汇系统规划”，不再只以 MVP 为目标 | 用户明确说明除四科联动外，其他部分可交给组员承担，因此应把功能面规划完整 |
+| 词汇资源要先标准化进入当前仓库，再由页面消费 | 避免运行时依赖外部 repo 路径，便于持久化和测试 |
+| 词汇关系首版先做双向同步，不做闭包推导 | 需求已满足，且复杂度明显更低 |
+| 词汇系统应作为左侧导航一级入口，而不是塞进 tools | 产品文档已把它定义为正式支撑模块 |
 
 ## 遇到的问题
 | 问题 | 解决方案 |
@@ -76,6 +106,8 @@
 - `src/utils/readingAnswer.js`
 - `src/utils/readingAnnotations.js`
 - `public/generated/IELTS Listening/`
+- `plan/Milestone5-词汇系统任务拆解.md`
+- `/Users/tiffany/code/my-ielts/src/pages/vocabulary/vocabulary.js`
 
 ## 视觉/浏览器发现
 - 本轮未进行浏览器检查。
