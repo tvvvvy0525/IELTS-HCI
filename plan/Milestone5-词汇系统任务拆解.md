@@ -108,7 +108,7 @@
 
 词汇资源来源：
 
-- `/Users/tiffany/code/my-ielts/src/pages/vocabulary/vocabulary.js`
+- `public/vocabulary.js`
 
 当前资源规模：
 
