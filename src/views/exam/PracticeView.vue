@@ -32,8 +32,8 @@
           :key="qId"
           :class="{
             'answered': !isSubmitted && answeredMap[qId],
-            'correct': isSubmitted && gradingResult[qId] === true,
-            'incorrect': isSubmitted && gradingResult[qId] === false
+            'correct': isSubmitted && (gradingResult[qId] === true || readingOverrides[qId]),
+            'incorrect': isSubmitted && gradingResult[qId] === false && !readingOverrides[qId]
           }"
           @click="scrollToQuestion(qId)"
         >
@@ -46,18 +46,22 @@
       <div class="explanation-card">
         <div class="explanation-header">
           <div>
-            <h3>错题解析</h3>
+            <h3>题目解析</h3>
             <p>提交后可按题号查看对应答案解释。</p>
           </div>
         </div>
 
-        <div v-if="incorrectQuestionIds.length" class="explanation-body">
+        <div v-if="examData?.questionOrder?.length" class="explanation-body">
           <div class="explanation-tabs">
             <button
-              v-for="qId in incorrectQuestionIds"
+              v-for="qId in examData?.questionOrder"
               :key="qId"
               class="explanation-tab"
-              :class="{ active: activeExplanationQuestionId === qId }"
+              :class="{ 
+                active: activeExplanationQuestionId === qId,
+                'tab-correct': gradingResult[qId] === true,
+                'tab-incorrect': gradingResult[qId] === false
+              }"
               type="button"
               @click="activeExplanationQuestionId = qId"
             >
@@ -65,11 +69,22 @@
             </button>
           </div>
 
-          <div v-if="activeExplanation" class="explanation-content">
-            <pre>{{ activeExplanation.text }}</pre>
-          </div>
-          <div v-else class="explanation-empty">
-            当前题目暂未接入解析数据。
+          <div class="explanation-detail" style="margin-top: 12px;">
+            <div v-if="activeExplanationQuestionId && gradingResult[activeExplanationQuestionId] === false" class="override-controls" style="margin-bottom: 12px;">
+              <button 
+                class="footer-btn" 
+                @click="toggleOverride(activeExplanationQuestionId)"
+                style="font-size: 0.9em; padding: 6px 12px;"
+              >
+                {{ readingOverrides[activeExplanationQuestionId] ? '取消平反' : '平反此题 (标记为正确)' }}
+              </button>
+            </div>
+            <div v-if="activeExplanation" class="explanation-text">
+              <pre>{{ activeExplanation.text }}</pre>
+            </div>
+            <div v-else class="explanation-empty">
+              当前题目暂未接入解析数据。
+            </div>
           </div>
         </div>
 
@@ -107,8 +122,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { saveExamRecord } from '../../utils/examHistory.js'
 import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
 import {
@@ -125,7 +140,20 @@ import { isReadingAnswerCorrect } from '../../utils/readingAnswer.js'
 import { findReadingExplanation } from '../../utils/readingExplanations.js'
 
 const route = useRoute()
+const router = useRouter()
 const examId = route.params.id
+
+watch(() => route.fullPath, () => {
+  if (route.query.reset === 'true') {
+    clearReadingAnnotationState(examId)
+    clearReadingDraftState(examId)
+    clearDraftSession('reading', examId)
+    
+    router.replace(route.path).then(() => {
+      window.location.reload();
+    })
+  }
+}, { immediate: true })
 const examData = ref(null)
 const loaded = ref(false)
 const isDark = ref(false)
@@ -144,6 +172,8 @@ const activeHlNode = ref(null)
 const answeredMap = ref({})
 const gradingResult = ref({})
 const isSubmitted = ref(false)
+const readingOverrides = ref({})
+const submissionTimestamp = ref(null)
 const explanationData = ref(null)
 const activeExplanationQuestionId = ref(null)
 
@@ -167,24 +197,21 @@ const activeExplanation = computed(() => (
     : null
 ))
 
-function loadReadingExplanationScript() {
-  return new Promise((resolve) => {
-    const scriptId = `reading-explanation-${examId}`
-    if (document.getElementById(scriptId)) {
-      resolve()
-      return
-    }
+const explanationModules = import.meta.glob('../../../generated/reading-explanations/*.js')
 
-    const script = document.createElement('script')
-    script.id = scriptId
-    script.src = `/generated/reading-explanations/${examId}.js`
-    script.onload = () => resolve()
-    script.onerror = () => {
-      console.warn('Reading explanation not found for exam:', examId)
-      resolve()
+async function loadReadingExplanationScript(id) {
+  const path = `../../../generated/reading-explanations/${id}.js`
+  const loadModule = explanationModules[path]
+  
+  if (loadModule) {
+    try {
+      await loadModule()
+    } catch (e) {
+      console.warn('Failed to load reading explanation module:', id, e)
     }
-    document.head.appendChild(script)
-  })
+  } else {
+    console.warn('Reading explanation not found in glob for exam:', id)
+  }
 }
 
 const startTimer = () => {
@@ -212,14 +239,38 @@ const updateAnsweredStatus = () => {
   for (const qId of examData.value.questionOrder) {
     let hasAns = false;
     const dropzone = document.querySelector(`[data-question="${qId}"]`);
+    
     if (dropzone && dropzone.querySelector('.drag-item')) {
       hasAns = true;
     } else {
-      const radio = document.querySelector(`input[name="${qId}"]:checked`);
-      if (radio) { hasAns = true; }
-      else {
-        const input = document.querySelector(`input[name="${qId}"]`);
-        if (input && input.value.trim() !== '') { hasAns = true; }
+      // 使用 getElementsByName 替代 querySelectorAll，避免 CSS 选择器解析错误
+      const elements = document.getElementsByName(qId);
+      
+      // 检查是否有选中的 radio
+      let hasCheckedRadio = false;
+      for (const el of elements) {
+        if (el.type === 'radio' && el.checked) {
+          hasCheckedRadio = true;
+          break;
+        }
+      }
+      
+      if (hasCheckedRadio) {
+        hasAns = true;
+      } else {
+        // 检查文本输入
+        for (const el of elements) {
+          if (el.type === 'radio' || el.type === 'checkbox') continue;
+          if (el.value && el.value.trim() !== '') {
+            hasAns = true;
+            break;
+          }
+        }
+        // 检查 textarea（如果不在 elements 中，因为 name 相同也可能被 getElementsByName 查到）
+        const textarea = document.querySelector(`textarea[name="${qId}"]`);
+        if (textarea && textarea.value.trim() !== '') {
+          hasAns = true;
+        }
       }
     }
     answeredMap.value[qId] = hasAns;
@@ -228,17 +279,30 @@ const updateAnsweredStatus = () => {
 }
 
 onMounted(async () => {
+  if (route.query.reset === 'true') {
+    clearDraftSession('reading', examId)
+    clearReadingAnnotationState(examId)
+  }
+
+  const mockMapping = {
+    'reading-p1-70': 'p1-low-70',
+    'reading-p3-180': 'p3-high-180',
+    'reading-p2-141': 'p2-high-141',
+    'reading-p1-171': 'p1-high-171',
+  };
+  const resolvedExamId = mockMapping[examId] || examId;
+
   // Mock the registry pattern from legacy code
   window.__READING_EXAM_DATA__ = {
     register: (id, payload) => {
-      if (id === examId) {
+      if (id === examId || id === resolvedExamId) {
         examData.value = payload
       }
     }
   }
   window.__READING_EXPLANATION_DATA__ = {
     register: (id, payload) => {
-      if (id === examId) {
+      if (id === examId || id === resolvedExamId) {
         explanationData.value = payload
       }
     },
@@ -246,8 +310,8 @@ onMounted(async () => {
 
   try {
     // Dynamic import matching legacy structure
-    await import(`../../../generated/reading-exams/${examId}.js`)
-    await loadReadingExplanationScript()
+    await import(`../../../generated/reading-exams/${resolvedExamId}.js`)
+    await loadReadingExplanationScript(resolvedExamId)
     loaded.value = true
     await nextTick()
     restoreReadingAnnotations()
@@ -291,6 +355,8 @@ function getReadingDraftSnapshot() {
     isSubmitted: isSubmitted.value,
     gradingResult: { ...gradingResult.value },
     answeredMap: { ...answeredMap.value },
+    readingOverrides: { ...readingOverrides.value },
+    submissionTimestamp: submissionTimestamp.value,
   }
 }
 
@@ -343,6 +409,66 @@ function restoreReadingAnnotations() {
   isSubmitted.value = savedDraft.isSubmitted || false
   gradingResult.value = { ...savedDraft.gradingResult }
   answeredMap.value = { ...savedDraft.answeredMap }
+  readingOverrides.value = savedDraft.readingOverrides || {}
+  submissionTimestamp.value = savedDraft.submissionTimestamp || null
+  
+  if (isSubmitted.value) {
+    if (!activeExplanationQuestionId.value) {
+      activeExplanationQuestionId.value = examData.value?.questionOrder?.[0] || null
+    }
+    
+    // 恢复原生 DOM 的红绿对错样式
+    for (const qId of examData.value?.questionOrder || []) {
+      const isCorrect = savedDraft.gradingResult?.[qId] === true
+      const isIncorrect = savedDraft.gradingResult?.[qId] === false
+      
+      const dropzone = document.querySelector(`[data-question="${qId}"]`)
+      if (dropzone) {
+        dropzone.classList.remove('is-correct', 'is-incorrect')
+        if (isCorrect) {
+          dropzone.classList.add('is-correct')
+        } else if (isIncorrect) {
+          dropzone.classList.add('is-incorrect')
+        }
+      }
+    }
+  }
+}
+
+const toggleOverride = (qId) => {
+  if (!readingOverrides.value[qId]) {
+    const userAnswer = answeredMap.value[qId] || '未作答';
+    const correctAnswer = examData.value?.answerKey?.[qId] || '无答案';
+    const confirmed = window.confirm(`你的回答：${userAnswer}；答案：${correctAnswer}；是否要标记为正确？`);
+    if (!confirmed) return;
+  }
+
+  readingOverrides.value[qId] = !readingOverrides.value[qId];
+  persistReadingDraft();
+  
+  if (isSubmitted.value && submissionTimestamp.value) {
+    let correctCount = 0;
+    for (const id of examData.value.questionOrder) {
+      if (gradingResult.value[id] === true || readingOverrides.value[id]) {
+        correctCount++;
+      }
+    }
+    
+    saveExamRecord({
+      timestamp: submissionTimestamp.value,
+      examId: examId,
+      title: examData.value.meta?.title || '未命名练习',
+      subject: 'reading',
+      part: examData.value.meta?.category || 'P1',
+      score: correctCount,
+      maxScore: examData.value.questionOrder.length,
+      durationSecs: elapsedSeconds.value,
+      routeTarget: {
+        path: `/exam/reading/${examId}`,
+      },
+      answers: getReadingDraftSnapshot()
+    });
+  }
 }
 
 // === Annotation Logic ===
@@ -543,8 +669,10 @@ const submitExam = () => {
   stopTimer();
 
   try {
+    const ts = new Date().toISOString();
+    submissionTimestamp.value = ts;
     saveExamRecord({
-      timestamp: new Date().toISOString(),
+      timestamp: ts,
       examId: examId,
       title: examData.value.meta?.title || '未命名练习',
       subject: 'reading',
@@ -555,6 +683,7 @@ const submitExam = () => {
       routeTarget: {
         path: `/exam/reading/${examId}`,
       },
+      answers: getReadingDraftSnapshot()
     });
     clearDraftSession('reading', examId)
   } catch (e) {
@@ -562,26 +691,15 @@ const submitExam = () => {
   }
 
   alert(`批改完成！用时: ${formattedTime.value}，正确率: ${correctCount} / ${examData.value.questionOrder.length}`);
-  activeExplanationQuestionId.value = incorrectQuestionIds.value[0] || null
+  activeExplanationQuestionId.value = examData.value?.questionOrder?.[0] || null
 }
 
 const resetExam = () => {
   if (!confirm("确定要清除所有答题记录吗？")) return;
-  isSubmitted.value = false;
-  gradingResult.value = {};
-  answeredMap.value = {};
-  notesStore.value = {};
-  elapsedSeconds.value = 0;
-  loaded.value = false;
   clearReadingAnnotationState(examId)
   clearReadingDraftState(examId)
   clearDraftSession('reading', examId)
-  activeExplanationQuestionId.value = null
-  stopTimer();
-  setTimeout(() => { 
-    loaded.value = true; 
-    startTimer();
-  }, 50);
+  window.location.reload();
 }
 
 const scrollToQuestion = (qId) => {
@@ -874,12 +992,25 @@ const scrollToQuestion = (qId) => {
   border-radius: 999px;
   padding: 8px 12px;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.explanation-tab.tab-correct {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #166534;
+}
+
+.explanation-tab.tab-incorrect {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
 }
 
 .explanation-tab.active {
-  background: var(--accent, #7c3aed);
-  border-color: var(--accent, #7c3aed);
-  color: white;
+  background: var(--accent, #7c3aed) !important;
+  border-color: var(--accent, #7c3aed) !important;
+  color: white !important;
 }
 
 .explanation-content {
@@ -889,7 +1020,7 @@ const scrollToQuestion = (qId) => {
   padding: 16px;
 }
 
-.explanation-content pre {
+.explanation-text pre {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;

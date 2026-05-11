@@ -178,14 +178,69 @@ const onIframeLoad = () => {
           setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 1500);
         }
 
-        // 统计当前正确数
+        // 统计当前正确数 (兼容单选、多选拆分为独立计分)
         window.calculateScore = function() {
-          const inputs = document.querySelectorAll('input.blank');
-          let score = 0;
-          inputs.forEach(input => {
-            if (input.classList.contains('input-correct')) score++;
-          });
-          return { score, total: inputs.length };
+          const script = document.getElementById('task-configuration');
+          if (script) {
+            try {
+              const text = script.textContent;
+              const newText = text.replace('const CONFIG_DATA =', 'window.__CONFIG_DATA__ =');
+              
+              const scriptEl = document.createElement('script');
+              scriptEl.textContent = newText;
+              document.body.appendChild(scriptEl);
+              
+              const config = window.__CONFIG_DATA__;
+              if (config) {
+                
+                let score = 0;
+                let total = 0;
+                
+                // 1. 统计单选题
+                if (config.answerKey && config.answerKey.single) {
+                  for (const [qKey, correctAns] of Object.entries(config.answerKey.single)) {
+                    total += 1;
+                    const radio = document.querySelector('input[name="' + qKey + '"]:checked');
+                    if (radio && radio.value === correctAns) {
+                      score += 1;
+                    }
+                  }
+                }
+                
+                // 2. 统计多选题 (每个正确选项算 1 题)
+                if (config.answerKey && config.answerKey.multiple) {
+                  for (const [qKey, correctAnsList] of Object.entries(config.answerKey.multiple)) {
+                    total += correctAnsList.length; // 比如双选题算 2 题
+                    
+                    const checkedList = [...document.querySelectorAll('input[name="' + qKey + '"]:checked')].map(el => el.value);
+                    
+                    // 答对几个选项就加几分
+                    correctAnsList.forEach(ans => {
+                      if (checkedList.includes(ans)) {
+                        score += 1;
+                      }
+                    });
+                  }
+                }
+                
+                return { score, total };
+              }
+            } catch (e) {
+              console.error("Failed to parse CONFIG_DATA for advanced scoring:", e);
+            }
+          }
+
+          // 兜底逻辑：如果解析失败，按导航点统计
+          const navItems = document.querySelectorAll('.q-nav-item');
+          if (navItems.length > 0) {
+            let score = 0;
+            navItems.forEach(item => {
+              if (item.classList.contains('correct')) score++;
+            });
+            return { score, total: navItems.length };
+          }
+          
+          return { score: 0, total: 0 };
         };
 
         // 通知到父窗体
