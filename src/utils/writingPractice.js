@@ -1,4 +1,5 @@
 const WRITING_PRACTICES_KEY = 'writing_practices_v1'
+export const WRITING_PRACTICES_UPDATED_EVENT = 'writing-practices-updated'
 
 function safeJsonParse(raw, fallback) {
   if (!raw) return fallback
@@ -18,6 +19,11 @@ function safeWrite(value) {
   localStorage.setItem(WRITING_PRACTICES_KEY, JSON.stringify(value))
 }
 
+function emitUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(WRITING_PRACTICES_UPDATED_EVENT))
+}
+
 function nowIso() {
   return new Date().toISOString()
 }
@@ -29,6 +35,29 @@ function makeId(prefix) {
 export function countWords(text) {
   if (!text) return 0
   return (text.trim().match(/\S+/g) || []).length
+}
+
+const SUBMISSION_RULES = {
+  task1: {
+    minWordsHard: 120,
+    minWordsSoft: 150,
+    requiredSections: ['intro', 'overview', 'body1'],
+    shortDurationSecs: 300,
+  },
+  task2: {
+    minWordsHard: 220,
+    minWordsSoft: 250,
+    requiredSections: ['intro', 'body1', 'body2'],
+    shortDurationSecs: 600,
+  },
+}
+
+const SECTION_LABELS = {
+  intro: '首段',
+  overview: '概述段',
+  body1: '主体段 1',
+  body2: '主体段 2',
+  conclusion: '总结段',
 }
 
 export function createPractice(taskType = 'task2') {
@@ -99,12 +128,65 @@ export function normalizePractice(raw) {
   return merged
 }
 
+export function evaluateSubmissionReadiness(rawPractice) {
+  const practice = normalizePractice(rawPractice)
+  const content = buildPracticeContent(practice)
+  const wordCount = practice.wordCount || countWords(content)
+  const rules = SUBMISSION_RULES[practice.taskType] || SUBMISSION_RULES.task2
+  const hardBlockers = []
+  const softWarnings = []
+
+  if (!practice.prompt.trim()) {
+    hardBlockers.push('题目不能为空')
+  }
+
+  if (wordCount < rules.minWordsHard) {
+    hardBlockers.push(
+      `字数未达到最低要求：${practice.taskType === 'task1' ? 'Task 1 至少 120 词' : 'Task 2 至少 220 词'}`,
+    )
+  } else if (wordCount < rules.minWordsSoft) {
+    softWarnings.push(
+      `建议达到完整字数：${practice.taskType === 'task1' ? 'Task 1 建议至少 150 词' : 'Task 2 建议至少 250 词'}`,
+    )
+  }
+
+  for (const key of rules.requiredSections) {
+    if (!(practice.paragraphs?.[key] || '').trim()) {
+      hardBlockers.push(`${SECTION_LABELS[key]} 未填写`)
+    }
+  }
+
+  if (!(practice.paragraphs?.conclusion || '').trim()) {
+    softWarnings.push('总结段未填写')
+  }
+
+  for (const [key, label] of Object.entries(SECTION_LABELS)) {
+    const sectionText = (practice.paragraphs?.[key] || '').trim()
+    if (sectionText && countWords(sectionText) < 15) {
+      softWarnings.push(`${label}内容较短，建议补充后再提交`)
+    }
+  }
+
+  const durationSecs = Number(practice.durationSecs || 0)
+  if ((practice.startedAt && durationSecs < rules.shortDurationSecs) || (!practice.startedAt && durationSecs === 0)) {
+    softWarnings.push('当前用时较短，建议确认是否已完成检查')
+  }
+
+  return {
+    canSubmit: hardBlockers.length === 0,
+    hardBlockers,
+    softWarnings,
+    wordCount,
+  }
+}
+
 export function getPractices() {
   return safeReadArray()
 }
 
 export function setPractices(practices) {
   safeWrite(practices)
+  emitUpdated()
 }
 
 export function upsertById(list, item) {

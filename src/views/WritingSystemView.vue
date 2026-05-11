@@ -60,7 +60,7 @@
           </button>
         </div>
 
-        <textarea v-model="current.prompt" class="input prompt" placeholder="输入写作题目..." />
+        <textarea v-model="current.prompt" class="input prompt" placeholder="输入写作题目..." @input="onEditorInput(false)" />
 
         <div v-if="current.taskType === 'task1'" class="chart-wrap">
           <label class="chart-label">图表上传</label>
@@ -78,7 +78,7 @@
               v-model="current.paragraphs[item.key]"
               class="textarea section-textarea"
               :placeholder="`请输入${item.label}内容...`"
-              @input="onEditorInput"
+              @input="onEditorInput(true)"
             />
           </div>
         </div>
@@ -87,12 +87,14 @@
           <span>词数: {{ current.wordCount }}</span>
           <span>状态: {{ current.status }}</span>
           <span>最后保存: {{ current.updatedAt ? new Date(current.updatedAt).toLocaleString() : '-' }}</span>
+          <span>反馈状态: {{ reviewStatusLabel }}</span>
         </div>
 
         <div class="editor-actions">
           <button class="ghost-btn" type="button" @click="startTimer" :disabled="timerRunning">开始计时</button>
           <button class="ghost-btn" type="button" @click="pauseTimer" :disabled="!timerRunning">暂停</button>
           <button class="ghost-btn" type="button" @click="saveDraft">保存草稿</button>
+          <button v-if="canOpenFeedback" class="ghost-btn" type="button" @click="openFeedback">{{ feedbackButtonLabel }}</button>
           <button class="primary-btn" type="button" @click="submitPractice">结束并提交</button>
         </div>
       </main>
@@ -102,12 +104,13 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { saveExamRecord } from '../utils/examHistory.js'
 import {
   buildPracticeContent,
   countWords,
   createPractice,
+  evaluateSubmissionReadiness,
   getPracticeSchema,
   getPractices,
   getSeedPrompts,
@@ -115,10 +118,14 @@ import {
   setPractices,
   upsertById,
 } from '../utils/writingPractice.js'
+import { getFeedbackList } from '../utils/writingFeedback.js'
+import { buildWritingFeedbackRoute } from '../utils/writingProgress.js'
 
 const route = useRoute()
+const router = useRouter()
 
 const practices = ref(getPractices())
+const feedbackList = ref(getFeedbackList())
 const current = ref(normalizePractice(createPractice()))
 const remainingSeconds = ref(current.value.remainingSeconds || current.value.durationMins * 60)
 const timerRunning = ref(false)
@@ -137,6 +144,17 @@ const sortedPractices = computed(() => {
 
 const sectionSchema = computed(() => getPracticeSchema(current.value.taskType))
 const currentSeedPrompts = computed(() => seedPrompts[current.value.taskType] || [])
+const currentFeedback = computed(() => feedbackList.value.find((item) => item.practiceId === current.value.id) || null)
+const canOpenFeedback = computed(() => current.value.status === 'submitted' || current.value.status === 'reviewed')
+const feedbackButtonLabel = computed(() => (current.value.status === 'reviewed' ? '查看反馈' : '去批改'))
+const reviewStatusLabel = computed(() => {
+  if (currentFeedback.value) {
+    return `已批改${Number.isFinite(Number(currentFeedback.value.bandOverall)) ? ` · Band ${currentFeedback.value.bandOverall}` : ''}`
+  }
+  if (current.value.status === 'submitted') return '待批改'
+  if (current.value.status === 'in_progress') return '写作中'
+  return '未提交'
+})
 
 function shortPrompt(prompt) {
   return (prompt || '未命名题目').slice(0, 28)
@@ -156,11 +174,14 @@ function scheduleAutoSave() {
   }, 1500)
 }
 
-function onEditorInput() {
+function onEditorInput(isContent = true) {
   current.value.content = buildPracticeContent(current.value)
   current.value.wordCount = countWords(current.value.content)
   if (current.value.status === 'draft') {
     current.value.status = 'in_progress'
+  }
+  if (isContent && !timerRunning.value && current.value.status === 'in_progress') {
+    startTimer()
   }
   scheduleAutoSave()
 }
@@ -202,7 +223,12 @@ function loadPractice(id) {
 
 function applySeedPrompt(prompt) {
   current.value.prompt = prompt
-  onEditorInput()
+  onEditorInput(false)
+}
+
+function openFeedback() {
+  if (!current.value.id || !canOpenFeedback.value) return
+  router.push(buildWritingFeedbackRoute(current.value.id))
 }
 
 function startTimer() {
@@ -230,13 +256,24 @@ function pauseTimer() {
 
 function submitPractice() {
   pauseTimer()
-  if (!current.value.prompt.trim()) {
-    alert('请先输入题目')
+  current.value.content = buildPracticeContent(current.value)
+  current.value.wordCount = countWords(current.value.content)
+  const readiness = evaluateSubmissionReadiness(current.value)
+
+  if (!readiness.canSubmit) {
+    alert(`以下条件未满足，不予提交：\n- ${readiness.hardBlockers.join('\n- ')}`)
     return
   }
 
-  current.value.content = buildPracticeContent(current.value)
-  current.value.wordCount = countWords(current.value.content)
+  if (readiness.softWarnings.length > 0) {
+    const shouldContinue = window.confirm(
+      `以下条件未满足，是否继续提交？\n- ${readiness.softWarnings.join('\n- ')}`,
+    )
+    if (!shouldContinue) {
+      return
+    }
+  }
+
   current.value.status = 'submitted'
   if (!current.value.startedAt) {
     current.value.startedAt = new Date().toISOString()
@@ -263,7 +300,7 @@ function submitPractice() {
     },
   })
 
-  alert('练笔已提交，已写入练习记录')
+  router.push(buildWritingFeedbackRoute(current.value.id))
 }
 
 function onChartUpload(event) {
@@ -292,6 +329,16 @@ if (route.query.practiceId) {
   const found = practices.value.find((p) => p.id === id)
   if (found) loadPractice(id)
 }
+
+watch(
+  () => route.query.practiceId,
+  (value) => {
+    if (!value) return
+    const id = String(value)
+    const found = practices.value.find((p) => p.id === id)
+    if (found && current.value.id !== id) loadPractice(id)
+  },
+)
 
 onBeforeUnmount(() => {
   pauseTimer()

@@ -5,6 +5,7 @@ import {
   buildPracticeContent,
   countWords,
   createPractice,
+  evaluateSubmissionReadiness,
   normalizePractice,
   upsertById,
 } from '../src/utils/writingPractice.js'
@@ -48,4 +49,68 @@ test('upsertById updates existing practices in place', () => {
   const next = upsertById(base, { id: 'a', prompt: 'new' })
   assert.equal(next.length, 1)
   assert.equal(next[0].prompt, 'new')
+})
+
+test('evaluateSubmissionReadiness blocks task1 submission when hard requirements are missing', () => {
+  const result = evaluateSubmissionReadiness(normalizePractice({
+    taskType: 'task1',
+    prompt: '',
+    paragraphs: {
+      intro: 'short intro',
+      overview: '',
+      body1: '',
+      body2: '',
+    },
+  }))
+
+  assert.equal(result.canSubmit, false)
+  assert.deepEqual(result.hardBlockers, [
+    '题目不能为空',
+    '字数未达到最低要求：Task 1 至少 120 词',
+    '概述段 未填写',
+    '主体段 1 未填写',
+  ])
+})
+
+test('evaluateSubmissionReadiness allows task2 submission with soft warnings', () => {
+  const result = evaluateSubmissionReadiness(normalizePractice({
+    taskType: 'task2',
+    prompt: 'Task 2 prompt',
+    content: 'one '.repeat(230).trim(),
+    wordCount: 230,
+    durationSecs: 300,
+    paragraphs: {
+      intro: 'intro '.repeat(18).trim(),
+      body1: 'body one '.repeat(20).trim(),
+      body2: 'body two '.repeat(20).trim(),
+      conclusion: '',
+    },
+  }))
+
+  assert.equal(result.canSubmit, true)
+  assert.deepEqual(result.hardBlockers, [])
+  assert.deepEqual(result.softWarnings, [
+    '建议达到完整字数：Task 2 建议至少 250 词',
+    '总结段未填写',
+  ])
+})
+
+test('evaluateSubmissionReadiness passes cleanly when task2 is complete', () => {
+  const result = evaluateSubmissionReadiness(normalizePractice({
+    taskType: 'task2',
+    prompt: 'Task 2 prompt',
+    content: 'essay '.repeat(260).trim(),
+    wordCount: 260,
+    durationSecs: 1400,
+    paragraphs: {
+      intro: 'intro '.repeat(20).trim(),
+      body1: 'body one '.repeat(40).trim(),
+      body2: 'body two '.repeat(40).trim(),
+      conclusion: 'conclusion '.repeat(20).trim(),
+    },
+  }))
+
+  assert.equal(result.canSubmit, true)
+  assert.deepEqual(result.hardBlockers, [])
+  assert.deepEqual(result.softWarnings, [])
 })
