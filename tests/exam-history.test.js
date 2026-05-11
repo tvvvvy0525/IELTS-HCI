@@ -154,6 +154,35 @@ test('getSubjectStats returns part breakdown and empty defaults', () => {
   assert.equal(speakingStats.accuracy, 0)
 })
 
+test('writing records without scores do not produce fake accuracy percentages', () => {
+  const storage = createMemoryStorage()
+
+  saveExamRecord({
+    timestamp: '2026-05-08T10:00:00.000Z',
+    subject: 'writing',
+    examId: 'writing-task2-01',
+    title: 'Writing Task 2',
+    part: 'P2',
+    score: 0,
+    maxScore: 0,
+    durationSecs: 1800,
+    routeTarget: {
+      path: '/exam/writing',
+      query: { practiceId: 'writing-task2-01' },
+    },
+  }, storage)
+
+  const [record] = getExamHistory(storage)
+  const stats = getExamStats(storage, '2026-05-08T12:00:00.000Z')
+  const writingStats = getSubjectStats('writing', storage)
+
+  assert.equal(record.accuracy, null)
+  assert.equal(stats.avgAccuracy, 0)
+  assert.equal(writingStats.count, 1)
+  assert.equal(writingStats.accuracy, 0)
+  assert.deepEqual(writingStats.parts, ['P1: 0%', 'P2: 待评分'])
+})
+
 test('getRecentExamRecords limits the result set', () => {
   const storage = createMemoryStorage()
 

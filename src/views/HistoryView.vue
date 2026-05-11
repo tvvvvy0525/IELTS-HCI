@@ -55,7 +55,7 @@
           <tr v-for="record in filteredRecords" :key="`${record.timestamp}-${record.examId}`">
             <td>
               <span class="subject-pill" :class="record.subject">
-                {{ record.subject === 'reading' ? '阅读' : '听力' }}
+                {{ subjectLabel(record.subject) }}
               </span>
             </td>
             <td><span class="freq">{{ record.part }}</span></td>
@@ -64,15 +64,20 @@
               <div class="history-subtitle">{{ record.examId }}</div>
             </td>
             <td>
-              <div class="score-line">{{ record.score }} / {{ record.maxScore }}</div>
-              <div class="score-subline">正确率 {{ record.accuracy }}%</div>
+              <div class="score-line">{{ scoreLabel(record) }}</div>
+              <div class="score-subline">{{ accuracyLabel(record) }}</div>
             </td>
             <td>{{ formatDuration(record.durationSecs) }}</td>
             <td>{{ formatCompletedAt(record.timestamp) }}</td>
             <td>
-              <button class="action-btn" type="button" @click="resumePractice(record)">
-                再练一次
-              </button>
+              <div class="action-group" style="display: flex; gap: 8px;">
+                <button class="action-btn" type="button" @click="resumePractice(record)">
+                  {{ actionLabel(record) }}
+                </button>
+                <button v-if="record.subject === 'reading' || record.subject === 'listening'" class="action-btn ghost-btn" type="button" @click="viewExplanation(record)" style="padding: 4px 8px; font-size: 0.82rem;">
+                  查看解析
+                </button>
+              </div>
             </td>
           </tr>
           <tr v-if="filteredRecords.length === 0">
@@ -110,6 +115,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { resolveRouteFromRecord } from '../utils/examNavigation.js'
+import { WRITING_FEEDBACK_UPDATED_EVENT, getFeedbackList } from '../utils/writingFeedback.js'
+import { buildWritingHistoryAction } from '../utils/writingProgress.js'
+import { saveReadingDraftState } from '../utils/readingDraftState.js'
 import {
   EXAM_HISTORY_UPDATED_EVENT,
   clearExamHistory,
@@ -119,6 +127,7 @@ import {
 
 const router = useRouter()
 const records = ref([])
+const feedbackList = ref([])
 const activeFilter = ref('all')
 const isDev = import.meta.env.DEV
 
@@ -127,6 +136,7 @@ const filters = [
   { value: 'reading', label: '阅读' },
   { value: 'listening', label: '听力' },
   { value: 'writing', label: '写作' },
+  { value: 'speaking', label: '口语' },
 ]
 
 const filteredRecords = computed(() => {
@@ -141,6 +151,7 @@ const latestCompletedAt = computed(() => {
 
 function refreshHistory() {
   records.value = getExamHistory()
+  feedbackList.value = getFeedbackList()
 }
 
 function formatDuration(durationSecs) {
@@ -161,8 +172,54 @@ function formatCompletedAt(timestamp) {
   }).format(date)
 }
 
+function scoreLabel(record) {
+  if (record.subject === 'writing' && !record.maxScore) return '待评分'
+  return `${record.score} / ${record.maxScore}`
+}
+
+function accuracyLabel(record) {
+  if (!Number.isFinite(record.accuracy)) return '等待批改结果'
+  return `正确率 ${record.accuracy}%`
+}
+
+function subjectLabel(subject) {
+  if (subject === 'reading') return '阅读'
+  if (subject === 'listening') return '听力'
+  if (subject === 'writing') return '写作'
+  if (subject === 'speaking') return '口语'
+  return subject
+}
+
+function actionLabel(record) {
+  if (record.subject === 'speaking') return '查看反馈'
+  if (record.subject !== 'writing') return '再练一次'
+  return buildWritingHistoryAction(record, feedbackList.value).label
+}
+
 async function resumePractice(record) {
-  router.push(await resolveRouteFromRecord(record))
+  if (record.subject === 'speaking') {
+    // 跳转到反馈页回看
+    router.push({ path: '/exam/speaking/feedback', query: { sessionId: record.examId } })
+    return
+  }
+  if (record.subject === 'writing') {
+    router.push(buildWritingHistoryAction(record, feedbackList.value).route)
+    return
+  }
+  const routeObj = await resolveRouteFromRecord(record)
+  if (typeof routeObj === 'string') {
+    router.push(`${routeObj}?reset=true`)
+  } else {
+    router.push({ ...routeObj, query: { ...routeObj.query, reset: 'true' } })
+  }
+}
+
+async function viewExplanation(record) {
+  if (record.answers) {
+    saveReadingDraftState(record.examId, record.answers)
+  }
+  const routeObj = await resolveRouteFromRecord(record)
+  router.push(routeObj)
 }
 
 function seedRecords() {
@@ -179,11 +236,13 @@ onMounted(() => {
   refreshHistory()
   window.addEventListener('storage', refreshHistory)
   window.addEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshHistory)
+  window.addEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshHistory)
 })
 
 onUnmounted(() => {
   window.removeEventListener('storage', refreshHistory)
   window.removeEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshHistory)
+  window.removeEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshHistory)
 })
 </script>
 
@@ -255,5 +314,25 @@ onUnmounted(() => {
 .subject-pill.listening {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.subject-pill.writing {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.subject-pill.speaking {
+  background: rgba(139,92,246,0.12);
+  color: #8b5cf6;
+}
+
+.action-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.action-btn {
+  white-space: nowrap;
 }
 </style>

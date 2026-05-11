@@ -1,79 +1,390 @@
 <template>
-  <div class="system-placeholder card">
+  <div class="speaking-system">
     <!-- Hero -->
-    <div class="placeholder-hero">
-      <div class="placeholder-hero-top">
-        <div>
-          <p class="eyebrow">Speaking</p>
-          <h2>口语练习</h2>
-        </div>
-        <div class="placeholder-icon-wrap speaking">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
+    <section class="speaking-hero card">
+      <div class="hero-left">
+        <p class="eyebrow">Speaking</p>
+        <h2>口语练习</h2>
+        <p class="hero-desc">选择 Part 模式，录音后 AI 给出四维反馈。无需 API Key 也可完成完整练习。</p>
+
+        <!-- ASR 状态条 -->
+        <div class="asr-status" :class="asrStatusClass">
+          <span class="asr-dot"></span>
+          <span>{{ asrStatusText }}</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span class="badge badge-wip">开发中</span>
-        <span style="color:var(--text-muted);font-size:0.78rem;">AI 语音模块，预计下一阶段上线</span>
+      <div class="placeholder-icon-wrap speaking">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
       </div>
-      <p>AI 口语教练模拟真实考试对话，覆盖 Part 1 / 2 / 3，录音转写后按四维标准给出发音和流利度反馈。</p>
+    </section>
+
+    <!-- Part 选择卡片 -->
+    <div class="part-cards">
+      <div
+        v-for="item in partOptions"
+        :key="item.part"
+        class="part-card card"
+        :class="{ active: selectedPart === item.part }"
+        @click="selectedPart = item.part"
+      >
+        <div class="part-card-header">
+          <div class="part-icon" :class="item.colorClass">
+            <svg v-if="item.part === 'Part1'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <svg v-else-if="item.part === 'Part2'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <div class="part-check" v-if="selectedPart === item.part">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+        </div>
+        <h3>{{ item.label }}</h3>
+        <p>{{ item.desc }}</p>
+        <div class="part-tags">
+          <span class="part-tag" v-for="tag in item.tags" :key="tag">{{ tag }}</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Feature grid -->
-    <div class="feature-grid">
-      <div class="feature-item">
-        <div class="feature-dot speaking">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-        </div>
+    <!-- 话题选择 -->
+    <section class="topic-section card">
+      <div class="topic-header">
         <div>
-          <h3>Part 1 · 自由问答</h3>
-          <p>随机抽取常见话题，AI 追问，无时间限制，适合热身练习。</p>
+          <h3>选择话题</h3>
+          <p class="topic-desc">选择练习话题，或使用随机话题</p>
         </div>
+        <button class="ghost-btn" @click="randomTopic" type="button">🎲 随机话题</button>
       </div>
+      <div class="topic-list">
+        <button
+          v-for="topic in topicList"
+          :key="topic.id"
+          class="topic-btn"
+          :class="{ active: selectedTopicId === topic.id }"
+          type="button"
+          @click="selectedTopicId = topic.id"
+        >
+          {{ topic.title }}
+        </button>
+      </div>
+    </section>
 
-      <div class="feature-item">
-        <div class="feature-dot speaking">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <path d="M8 21h8M12 17v4"/>
-          </svg>
-        </div>
-        <div>
-          <h3>Part 2 · Cue Card</h3>
-          <p>1 分钟准备 + 2 分钟作答，内置倒计时，真实考试还原。</p>
-        </div>
-      </div>
-
-      <div class="feature-item">
-        <div class="feature-dot neutral">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-        </div>
-        <div>
-          <h3>Part 3 · 深度追问</h3>
-          <p>AI 扮演考官，围绕 Part 2 话题追问 4～6 个高阶问题。</p>
-        </div>
-      </div>
-
-      <div class="feature-item">
-        <div class="feature-dot neutral">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-          </svg>
-        </div>
-        <div>
-          <h3>四维评分反馈</h3>
-          <p>流利度、词汇、语法、发音，AI 分析录音后生成可操作建议。</p>
-        </div>
-      </div>
+    <!-- 开始按钮 -->
+    <div class="start-action">
+      <button class="primary-btn start-btn" type="button" @click="startPractice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        开始 {{ selectedPart }} 练习
+      </button>
+      <span class="start-hint">练习完成后将自动生成评分报告并保存记录</span>
     </div>
   </div>
 </template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { getTopicList, getRandomTopic } from '../utils/speakingPractice.js'
+import { getSpeakingSettings } from '../utils/speakingSettings.js'
+import { isBrowserAsrSupported } from '../utils/speakingAsrProviders.js'
+
+const router = useRouter()
+
+const partOptions = [
+  {
+    part: 'Part1',
+    label: 'Part 1 · 自由问答',
+    desc: '随机抽取常见话题，回答 4-5 个问题，适合热身练习。',
+    tags: ['无时间限制', '5 道题'],
+    colorClass: 'green',
+  },
+  {
+    part: 'Part2',
+    label: 'Part 2 · Cue Card',
+    desc: '1 分钟准备 + 2 分钟独白，内置双计时器，还原真实考试节奏。',
+    tags: ['60s 准备', '120s 作答'],
+    colorClass: 'blue',
+  },
+  {
+    part: 'Part3',
+    label: 'Part 3 · 深度追问',
+    desc: '围绕 Part 2 话题进行 5 个高阶讨论问题，测试深度思考能力。',
+    tags: ['5 道追问', '无时间限制'],
+    colorClass: 'purple',
+  },
+]
+
+const selectedPart = ref('Part2')
+const topicList = ref([])
+const selectedTopicId = ref('')
+
+// ASR 可用状态
+const asrStatusText = ref('检测语音服务中...')
+const asrStatusClass = ref('checking')
+
+onMounted(async () => {
+  const topics = getTopicList()
+  topicList.value = topics
+  selectedTopicId.value = topics[0]?.id || ''
+
+  // 检测 ASR 可用状态
+  const settings = getSpeakingSettings()
+  if (!isBrowserAsrSupported()) {
+    asrStatusText.value = '浏览器不支持语音识别，将使用手动输入模式'
+    asrStatusClass.value = 'warn'
+  } else {
+    const modeLabel = {
+      auto: '自动选择最佳 ASR',
+      browser: '浏览器语音识别',
+      local: '本地 ASR 服务',
+      server: '远端 ASR 服务',
+    }[settings.asrMode] || '自动模式'
+    asrStatusText.value = `语音识别就绪 · ${modeLabel}`
+    asrStatusClass.value = 'ready'
+  }
+})
+
+function randomTopic() {
+  const topic = getRandomTopic()
+  selectedTopicId.value = topic.id
+}
+
+function startPractice() {
+  router.push({
+    path: '/exam/speaking/practice',
+    query: {
+      part: selectedPart.value,
+      topicId: selectedTopicId.value,
+    },
+  })
+}
+</script>
+
+<style scoped>
+.speaking-system {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.speaking-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 24px;
+}
+
+.hero-left {
+  flex: 1;
+}
+
+.hero-desc {
+  color: var(--text-secondary);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+.asr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.asr-status.ready {
+  background: var(--success-soft, rgba(40,167,69,0.12));
+  color: var(--success, #28a745);
+}
+
+.asr-status.warn {
+  background: var(--warning-soft, rgba(255,193,7,0.12));
+  color: var(--warning, #e6a817);
+}
+
+.asr-status.checking {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+}
+
+.asr-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.asr-status.ready .asr-dot {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.part-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .part-cards { grid-template-columns: 1fr; }
+  .speaking-hero { flex-direction: column; }
+}
+
+.part-card {
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  border: 2px solid transparent;
+  padding: 20px;
+}
+
+.part-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 99,102,241), 0.12);
+}
+
+.part-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.part-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.part-icon svg { width: 18px; height: 18px; }
+
+.part-icon.green { background: var(--success-soft, rgba(40,167,69,0.12)); color: var(--success, #28a745); }
+.part-icon.blue { background: var(--accent-soft); color: var(--accent); }
+.part-icon.purple { background: rgba(139,92,246,0.12); color: #8b5cf6; }
+
+.part-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.part-card h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.part-card p {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.part-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.part-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.topic-section {
+  padding: 20px;
+}
+
+.topic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.topic-header h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
+.topic-desc { font-size: 0.82rem; color: var(--text-muted); }
+
+.topic-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topic-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.topic-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topic-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.start-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.start-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  font-size: 0.95rem;
+}
+
+.start-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+</style>

@@ -6,6 +6,8 @@ export const EXAM_HISTORY_UPDATED_EVENT = 'exam-history-updated'
 const SUBJECT_PARTS = {
   reading: ['P1', 'P2', 'P3'],
   listening: ['P1', 'P2', 'P3', 'P4'],
+  writing: ['P1', 'P2'],
+  speaking: ['Part1', 'Part2', 'Part3'],
 }
 
 const GENERIC_LISTENING_TITLES = new Set([
@@ -32,7 +34,7 @@ function toIsoTimestamp(value) {
 }
 
 function roundAccuracy(score, maxScore) {
-  if (!maxScore) return 0
+  if (!maxScore) return null
   return Math.round((score / maxScore) * 100)
 }
 
@@ -76,6 +78,14 @@ function buildDefaultRouteTarget(subject, examId, title) {
   if (subject === 'reading') {
     return {
       path: examId ? `/exam/reading/${examId}` : '/exam/reading',
+    }
+  }
+
+  if (subject === 'speaking') {
+    // 回看 speaking 记录时跳转到反馈页
+    return {
+      path: '/exam/speaking/feedback',
+      query: examId ? { sessionId: examId } : {},
     }
   }
 
@@ -129,7 +139,7 @@ export function normalizeExamRecord(record) {
   const durationSecs = toNumber(record?.durationSecs)
   const title = record?.title || '未命名练习'
 
-  return {
+  const base = {
     timestamp: toIsoTimestamp(record?.timestamp),
     subject,
     examId: record?.examId || '',
@@ -137,12 +147,25 @@ export function normalizeExamRecord(record) {
     part: record?.part || (SUBJECT_PARTS[subject]?.[0] ?? ''),
     score,
     maxScore,
-    accuracy: Number.isFinite(Number(record?.accuracy))
+    accuracy: record?.accuracy === null
+      ? null
+      : Number.isFinite(Number(record?.accuracy))
       ? toNumber(record.accuracy)
       : roundAccuracy(score, maxScore),
     durationSecs,
     routeTarget: normalizeRouteTarget(record?.routeTarget, subject, record?.examId || '', title),
+    answers: record?.answers || null,
   }
+
+  // speaking 专属字段
+  if (subject === 'speaking') {
+    base.transcript = record?.transcript || ''
+    base.asrProvider = record?.asrProvider || ''
+    base.feedbackSummary = record?.feedbackSummary || ''
+    base.feedbackData = record?.feedbackData || null
+  }
+
+  return base
 }
 
 function compareByNewest(a, b) {
@@ -236,12 +259,13 @@ function computeStreak(records, nowValue = new Date().toISOString()) {
 export function getExamStats(storage, nowValue) {
   const records = getExamHistory(storage)
   const totalSessions = records.length
-  const totalAccuracy = records.reduce((sum, record) => sum + record.accuracy, 0)
+  const scoredRecords = records.filter((record) => Number.isFinite(record.accuracy))
+  const totalAccuracy = scoredRecords.reduce((sum, record) => sum + record.accuracy, 0)
   const totalDurationSecs = records.reduce((sum, record) => sum + record.durationSecs, 0)
 
   return {
     totalSessions,
-    avgAccuracy: totalSessions ? Math.round(totalAccuracy / totalSessions) : 0,
+    avgAccuracy: scoredRecords.length ? Math.round(totalAccuracy / scoredRecords.length) : 0,
     totalMinutes: Math.round(totalDurationSecs / 60),
     streak: computeStreak(records, nowValue),
     recentRecords: records.slice(0, 3),
@@ -252,18 +276,21 @@ export function getSubjectStats(subject, storage) {
   const records = getExamHistory(storage).filter((record) => record.subject === subject)
   const parts = SUBJECT_PARTS[subject] || []
   const totalDurationSecs = records.reduce((sum, record) => sum + record.durationSecs, 0)
-  const totalAccuracy = records.reduce((sum, record) => sum + record.accuracy, 0)
+  const scoredRecords = records.filter((record) => Number.isFinite(record.accuracy))
+  const totalAccuracy = scoredRecords.reduce((sum, record) => sum + record.accuracy, 0)
 
   return {
     count: records.length,
     duration: Math.round(totalDurationSecs / 60),
-    accuracy: records.length ? Math.round(totalAccuracy / records.length) : 0,
+    accuracy: scoredRecords.length ? Math.round(totalAccuracy / scoredRecords.length) : 0,
     parts: parts.map((part) => {
       const partRecords = records.filter((record) => record.part === part)
-      const partAccuracy = partRecords.length
-        ? Math.round(partRecords.reduce((sum, record) => sum + record.accuracy, 0) / partRecords.length)
-        : 0
-      return `${part}: ${partAccuracy}%`
+      const scoredPartRecords = partRecords.filter((record) => Number.isFinite(record.accuracy))
+      const partAccuracy = scoredPartRecords.length
+        ? Math.round(scoredPartRecords.reduce((sum, record) => sum + record.accuracy, 0) / scoredPartRecords.length)
+        : null
+      if (Number.isFinite(partAccuracy)) return `${part}: ${partAccuracy}%`
+      return partRecords.length ? `${part}: 待评分` : `${part}: 0%`
     }),
   }
 }
