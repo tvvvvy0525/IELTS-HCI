@@ -92,31 +92,40 @@
       <SubjectProgress
         subject="writing"
         title="写作专项"
-        :duration="0"
+        :duration="writingStats.duration"
         :accuracy="null"
-        :count="0"
-        :parts="['Task 1 待练习', 'Task 2 待练习']"
+        :count="writingStats.count"
+        :parts="writingStats.parts"
       />
       <SubjectProgress
         subject="speaking"
         title="口语专项"
-        :duration="0"
+        :duration="speakingStats.duration"
         :accuracy="null"
-        :count="0"
-        :parts="['Part 1 待练习', 'Part 2 待练习', 'Part 3 待练习']"
+        :count="speakingStats.count"
+        :parts="speakingStats.parts"
       />
     </div>
 
+    <WritingTrendChart
+      :labels="trendData.labels"
+      :data-points="trendData.data"
+    />
+
     <section class="card vocabulary-entry-card">
-      <div>
+      <div class="vocab-info-wrapper">
         <p class="eyebrow">Vocabulary</p>
-        <h2>词汇系统入口已就绪</h2>
+        <h2>词汇复习进度</h2>
         <p class="dashboard-subtitle">
-          词汇模块的独立路由和页面骨架已经接入，后续可以直接在该入口下扩展词库、单词详情、今日复习和四科联动。
+          今日目标：{{ vocabState.dailyProgress.knownCount }} / {{ vocabState.dailyGoal }} 词
+          <span v-if="daysRemaining !== null">（距离考试 {{ daysRemaining }} 天）</span>
         </p>
+        <div class="vocab-progress-bar">
+          <div class="bar-fill" :style="{ width: vocabProgressPercentage + '%' }"></div>
+        </div>
       </div>
       <button class="ghost-btn" type="button" @click="openVocabulary">
-        打开词汇系统
+        进入词汇系统
       </button>
     </section>
   </div>
@@ -126,7 +135,12 @@
 import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import SubjectProgress from '../components/SubjectProgress.vue'
+import WritingTrendChart from '../components/WritingTrendChart.vue'
 import { resolveRouteFromRecord } from '../utils/examNavigation.js'
+import { WRITING_FEEDBACK_UPDATED_EVENT, getFeedbackList } from '../utils/writingFeedback.js'
+import { WRITING_PRACTICES_UPDATED_EVENT, getPractices } from '../utils/writingPractice.js'
+import { buildWritingHistoryAction, getWritingDashboardStats, getWritingTrendData } from '../utils/writingProgress.js'
+import { vocabularyStore } from '../utils/vocabularyStore.js'
 import {
   EXAM_DRAFTS_UPDATED_EVENT,
   getLatestDraftSession,
@@ -138,6 +152,24 @@ import {
 } from '../utils/examHistory.js'
 
 const router = useRouter()
+
+// 词汇系统状态
+const vocabState = vocabularyStore.state
+
+const vocabProgressPercentage = computed(() => {
+  if (vocabState.dailyGoal <= 0) return 100
+  const pct = (vocabState.dailyProgress.knownCount / vocabState.dailyGoal) * 100
+  return pct > 100 ? 100 : pct
+})
+
+const daysRemaining = computed(() => {
+  if (!vocabState.examDate) return null
+  const today = new Date()
+  const exam = new Date(vocabState.examDate)
+  const diffTime = exam.getTime() - today.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays > 0 ? diffDays : 0
+})
 
 const stats = reactive({
   totalSessions: 0,
@@ -162,6 +194,28 @@ const listeningStats = reactive({
   parts: ['P1: 0%', 'P2: 0%', 'P3: 0%', 'P4: 0%'],
 })
 
+const writingStats = reactive({
+  duration: 0,
+  accuracy: null,
+  count: 0,
+  parts: ['Task 1 待练习', 'Task 2 待练习'],
+  latestBand: null,
+  latestPracticeId: '',
+  latestStatusLabel: '待开始',
+})
+
+const speakingStats = reactive({
+  duration: 0,
+  accuracy: null,
+  count: 0,
+  parts: ['Part1: 0%', 'Part2: 0%', 'Part3: 0%'],
+})
+
+const trendData = reactive({
+  labels: [],
+  data: [],
+})
+
 const recentSummary = computed(() => {
   if (stats.latestDraft) {
     return `有未完成练习：${stats.latestDraft.title}，可继续上次进度。`
@@ -172,6 +226,10 @@ const recentSummary = computed(() => {
     return '当前还没有练习记录，先从一套阅读题开始。'
   }
 
+  if (recentRecord.subject === 'writing') {
+    return `最近完成：${recentRecord.title}，${writingStats.latestStatusLabel}。`
+  }
+
   return `最近完成：${recentRecord.title}，正确率 ${recentRecord.accuracy}%。`
 })
 
@@ -179,6 +237,13 @@ function refreshDashboard() {
   Object.assign(stats, getExamStats())
   Object.assign(readingStats, getSubjectStats('reading'))
   Object.assign(listeningStats, getSubjectStats('listening'))
+  Object.assign(writingStats, getWritingDashboardStats(getPractices(), getFeedbackList()))
+  Object.assign(speakingStats, getSubjectStats('speaking'))
+  
+  const newTrendData = getWritingTrendData(getPractices(), getFeedbackList())
+  trendData.labels = newTrendData.labels
+  trendData.data = newTrendData.data
+
   stats.latestDraft = getLatestDraftSession()
 }
 
@@ -190,6 +255,10 @@ async function startPractice() {
 
   const recentRecord = stats.recentRecords[0]
   if (recentRecord) {
+    if (recentRecord.subject === 'writing') {
+      router.push(buildWritingHistoryAction(recentRecord, getFeedbackList()).route)
+      return
+    }
     router.push(await resolveRouteFromRecord(recentRecord))
     return
   }
@@ -206,12 +275,16 @@ onMounted(() => {
   window.addEventListener('storage', refreshDashboard)
   window.addEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshDashboard)
   window.addEventListener(EXAM_DRAFTS_UPDATED_EVENT, refreshDashboard)
+  window.addEventListener(WRITING_PRACTICES_UPDATED_EVENT, refreshDashboard)
+  window.addEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshDashboard)
 })
 
 onUnmounted(() => {
   window.removeEventListener('storage', refreshDashboard)
   window.removeEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshDashboard)
   window.removeEventListener(EXAM_DRAFTS_UPDATED_EVENT, refreshDashboard)
+  window.removeEventListener(WRITING_PRACTICES_UPDATED_EVENT, refreshDashboard)
+  window.removeEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshDashboard)
 })
 </script>
 
@@ -228,6 +301,26 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 20px;
   padding: 22px 24px;
+}
+
+.vocab-info-wrapper {
+  flex: 1;
+}
+
+.vocab-progress-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 10px;
+  max-width: 400px;
+}
+
+.vocab-progress-bar .bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF5E62 0%, #FF9966 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
 }
 
 .vocabulary-entry-card h2 {
