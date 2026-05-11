@@ -66,14 +66,23 @@
 ## 备注
 - 本文件只记录可信的计划与决策，不放外部原文内容。
 - 后续每次开始新开发任务，先读取本文件与 `plan/findings.md`、`plan/progress.md`。
-- 本轮里程碑拆解详见 `plan/Milestone1-学习闭环任务拆解.md`。
+- 本轮里程碑拆解详见 `plan/completed/Milestone1-学习闭环任务拆解.md`。
 - Milestone 1 已完成。
-- Milestone 2 拆解详见 `plan/Milestone2-Listening可部署化任务拆解.md`。
+- Milestone 2 拆解详见 `plan/completed/Milestone2-Listening可部署化任务拆解.md`。
 - Milestone 2 已完成。
-- Milestone 3 拆解详见 `plan/Milestone3-Reading体验补齐任务拆解.md`。
+- Milestone 3 拆解详见 `plan/completed/Milestone3-Reading体验补齐任务拆解.md`。
 - Milestone 3 已完成。
 - 已补充“大功能优先级”和“闭环完善未完成项”记录，供下一阶段排期使用。
-- Milestone 4 拆解详见 `plan/Milestone4-WritingMVP任务拆解.md`。
+- Milestone 4 拆解详见 `plan/completed/Milestone4-WritingMVP任务拆解.md`。
 - Milestone 4 已完成基础编辑器落地。
 - Milestone 5 拆解详见 `plan/Milestone5-词汇系统任务拆解.md`。
+- 遗留功能补齐详见 `plan/Milestone8-遗留功能补齐与体验增强.md`。
 - 当前建议下一里程碑优先进入词汇系统完整版本，而不是继续扩写作反馈。
+- 如果 `Writing` 继续推进自动化方向，优先采用“网页端 + 本机 Ollama + 手动兜底”，而不是桌面端打包模型。
+
+## Milestone 8 实施进展
+- [ ] Reading 人工判定覆盖 (叉变勾)
+- [ ] Reading 完整断点续做 (恢复已提交视图)
+- [ ] Writing 范文解析库
+- [ ] Writing 反馈页原文对照与段落高亮
+- **状态：** in_progress

@@ -36,13 +36,13 @@
 
 ## 6. 当前遗留
 
-- 仍无正式 Writing 题库资源
-- 仍无 AI 反馈
-- 已有 `Writing Feedback` 页面，但仍需补稳定入口与更顺滑的回流
-- Dashboard 中写作统计尚未充分接入
+- 仍无正式 Writing 题库资源 **(已移至 Milestone 8)**
+- 仍无自动化 AI 反馈链路 **(已移至 Milestone 7/8)**
+- 已进入 `Writing Feedback` 闭环阶段，后续重点不再是“有没有反馈页”，而是反馈质量和复盘体验 **(已移至 Milestone 8)**
+- 题库与范文资源仍未补齐 **(已移至 Milestone 8)**
 
 ## 7. 下一步建议
 
-1. 建立最小 Writing 题库资源层
-2. 打通 `练笔 -> 批改 -> History / Dashboard` 的反馈回流
-3. 再把 Writing 统计接入 Dashboard
+1. 继续推进 `Milestone 6：Writing 反馈与题库闭环`
+2. 在不优先补题库的前提下，先补反馈质量和复盘体验
+3. 后续再回到题库资源层

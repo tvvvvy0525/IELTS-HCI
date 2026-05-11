@@ -293,11 +293,215 @@
 ## 五问重启检查
 | 问题 | 答案 |
 |------|------|
-| 我在哪里？ | Milestone 4 已完成，Milestone 5 完整规划已产出 |
-| 我要去哪里？ | 等待确认后进入词汇系统完整实现阶段 |
-| 目标是什么？ | 用现有词汇资源落地一个完整且可协作分工的词汇系统 |
+| 我在哪里？ | Reading / Listening 闭环已完成，Writing 基础闭环已形成 |
+| 我要去哪里？ | 进入 `Milestone 7：Writing 自动化 AI 反馈（Ollama）` 规划阶段 |
+| 目标是什么？ | 保留网页端形态，通过本机 `Ollama` 实现自动化写作批改，并保留手动兜底链路 |
 | 我学到了什么？ | 见 `plan/findings.md` |
 | 我做了什么？ | 见上方记录 |
+
+## 会话：2026-05-09（Writing 自动化 AI 反馈方案规划）
+
+### 阶段 1：路线收敛
+- **状态：** complete
+- 执行的操作：
+  - 明确不走桌面端打包模型路线
+  - 确认采用 `A + C`：
+    - 浏览器前端直连本机 `Ollama`
+    - 手动评分 / 复制 prompt / 粘贴 JSON 保留兜底
+
+### 阶段 2：正式规划文档输出
+- **状态：** complete
+- 执行的操作：
+  - 新增 `Milestone 7` 正式实施规划
+  - 补充设置页、Ollama 调用层、自动批改入口、错误处理、验证方式
+- 创建/修改的文件：
+  - `plan/Milestone7-Writing自动化AI反馈-Ollama任务拆解.md`
+  - `plan/task_plan.md`
+  - `plan/findings.md`
+  - `plan/progress.md`
+
+### 阶段 3：Milestone 7 落地实施
+- **状态：** complete
+- 执行的操作：
+  - 新增 `src/utils/writingAiOllama.js`，实现与本地 Ollama 的通信（支持流式输出、JSON 模式、超时控制和 DeepSeek 思维链解析）。
+  - 新增 `src/utils/writingAiClient.js`，封装自动批改和范文生成的上层业务逻辑。
+  - 实现了写作提交后的自动批改闭环，并支持生成高分范文。
+- 创建/修改的文件：
+  - `src/utils/writingAiOllama.js`
+  - `src/utils/writingAiClient.js`
+
+## 会话：2026-05-10（Milestone 8 规划与目录整理）
+
+### 阶段 1：目录整理与 Milestone 8 初步创建
+- **状态：** complete
+- **开始时间：** 2026-05-10
+- 执行的操作：
+  - 分析 `plan` 目录下文件的功能交叉情况。
+  - 创建 `Milestone8` 文件，收纳从 Milestone 3、4、6 遗留的未完成任务。
+  - 将已完成基础部分的 Milestone 1、2、3、4、6 移动到 `plan/completed/` 目录。
+  - 更新 `task_plan.md` 和 `开发进度统计.md`。
+- 创建/修改的文件：
+  - `plan/Milestone8-遗留功能补齐与体验增强.md`
+  - `plan/task_plan.md`
+  - `plan/开发进度统计.md`
+
+### 阶段 2：Milestone 8 需求修正与完善
+- **状态：** complete
+- 执行的操作：
+  - 根据用户反馈，纠正对 Reading 容错规则扩展的理解为“人工判定覆盖”。
+  - 明确“正式题库资源层”继续不做。
+  - 更新 `Milestone8-遗留功能补齐与体验增强.md`。
+- 创建/修改的文件：
+  - `plan/Milestone8-遗留功能补齐与体验增强.md`
+
+### 阶段 3：按 Milestone 7 结构重构 Milestone 8
+- **状态：** complete
+- 执行的操作：
+  - 参照 `Milestone 7` 的 11 个章节结构，重写 `Milestone 8`。
+  - 细化了目标、现状、策略、范围、不做项、标准、拆解、产出、验证、风险和建议。
+- 创建/修改的文件：
+  - `plan/Milestone8-遗留功能补齐与体验增强.md`
+
+### 阶段 4：实现 Reading 人工判定覆盖
+- **状态：** complete
+- 执行的操作：
+  - 在 `PracticeView.vue` 中添加 `readingOverrides` 和 `submissionTimestamp` 状态。
+  - 在错题解析面板中增加“平反此题”按钮，允许用户切换对错。
+  - 联动更新 `examHistory` 中的得分，确保 Dashboard 统计同步更新。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+  - `plan/findings.md`
+
+### 阶段 5：修复 Reading 题目加载失败 Bug
+- **状态：** complete
+- 执行的操作：
+  - 排查了“无法加载题目：reading-p3-180”的 Bug。
+  - 发现原因是历史记录的种子数据 ID 与实际生成的文件名不匹配。
+  - 在 `PracticeView.vue` 中增加了 `mockMapping` 字典进行兼容转换。
+  - 进一步修复了加载后内容空白的问题（放宽了 `register` 函数中的 ID 匹配条件）。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+  - `plan/findings.md`
+
+### 阶段 6：修复 Reading 答题状态误判 Bug
+- **状态：** complete
+- 执行的操作：
+  - 修复了 `updateAnsweredStatus` 中对未选中单选框 `value` 的误读。
+  - 增加了对 `radio` 和 `checkbox` 的类型过滤，仅通过 `:checked` 判断。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+  - `plan/findings.md`
+
+### 阶段 7：修复 Reading 题目导航消失 Bug
+- **状态：** complete
+- 执行的操作：
+  - 将 `updateAnsweredStatus` 中的 `querySelectorAll` 替换为 `getElementsByName`，避免 CSS 选择器语法错误。
+  - 优化了 Radio 的选中检查逻辑。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 8：修复 Reading 解析加载路径与平反按钮位置
+- **状态：** complete
+- 执行的操作：
+  - 修改 `loadReadingExplanationScript` 使其接收参数，并使用 `resolvedExamId` 加载解析文件，修复了因文件名不匹配导致无法加载解析的 Bug。
+  - 将“平反此题”按钮移出 `v-if` 条件块，确保无解析数据时也能进行平反操作。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 9：重构 Reading 解析加载为动态 Import
+- **状态：** complete
+- 执行的操作：
+  - 将 `loadReadingExplanationScript` 改为使用 `import(...)` 动态导入，解决了 Vite 开发服务器无法直接访问项目根目录下 `generated` 文件夹内静态资源导致的 404 问题。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 10：使用 import.meta.glob 解决 Vite 动态导入限制
+- **状态：** complete
+- 执行的操作：
+  - 使用 `import.meta.glob` 预先扫描 `reading-explanations` 目录下的所有 JS 文件，解决了 Vite 无法处理完全动态路径 `import(...)` 的限制。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 11：支持查看所有题目的解析
+- **状态：** complete
+- 执行的操作：
+  - 将解析面板的 Tabs 循环从 `incorrectQuestionIds` 改为 `examData.questionOrder`，支持查看所有题目的解析。
+  - 添加了 `tab-correct` 和 `tab-incorrect` 样式，以区分对错。
+  - 提交后默认选中第 1 题的解析。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 12：完善平反功能、支持再练一次重置及增加历史解析按钮
+- **状态：** complete
+- 执行的操作：
+  - 在 `PracticeView.vue` 中，限制平反按钮仅在错题时显示。
+  - 在 `PracticeView.vue` 的 `toggleOverride` 中增加了二次确认弹窗，显示用户回答和正确答案。
+  - 在 `PracticeView.vue` 的 `onMounted` 中支持了 `?reset=true` 参数，用于清空草稿。
+  - 在 `HistoryView.vue` 中，点击“再练一次”时拼接 `?reset=true`。
+  - 在 `HistoryView.vue` 中增加了“查看解析”按钮，直接跳转不带 reset 参数（复用草稿机制）。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+  - `src/views/HistoryView.vue`
+
+### 阶段 13：改为使用强制刷新页面彻底解决重置无效问题
+- **状态：** complete
+- 执行的操作：
+  - 在 `PracticeView.vue` 中增加了对 `route.fullPath` 的 `watch`，当发现 `?reset=true` 时，清空缓存并调用 `window.location.reload()`。
+  - 修改了 `resetExam` 函数，在清空缓存后同样调用 `window.location.reload()`。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 14：实现历史记录绑定完整答题草稿，彻底解决重置后无法查看历史解析的问题
+- **状态：** complete
+- 执行的操作：
+  - 在 `examHistory.js` 中，为 `normalizeExamRecord` 增加了 `answers` 字段支持。
+  - 在 `PracticeView.vue` 中，提交或平反时将完整的 `ReadingDraftState` 存入历史记录的 `answers` 字段。
+  - 在 `HistoryView.vue` 中，点击“查看解析”时，如果记录中存在 `answers`，则在跳转前将其恢复至缓存。
+- 创建/修改的文件：
+  - `src/utils/examHistory.js`
+  - `src/views/exam/PracticeView.vue`
+  - `src/views/HistoryView.vue`
+
+### 阶段 15：优化历史记录保存机制，改用快照（Snapshot）保存完整 DOM 状态
+- **状态：** complete
+- 执行的操作：
+  - 在 `PracticeView.vue` 中，将 `saveExamRecord` 时保存的 `answers` 从 `getReadingDraftState(examId)` 改为 `getReadingDraftSnapshot()`。
+  - 这样可以确保历史记录中包含提交瞬间的完整 DOM HTML（包括红绿对错样式）和最新的用户答案。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 16：优化恢复历史记录时的 DOM 染色
+- **状态：** complete
+- 执行的操作：
+  - 在 `restoreReadingAnnotations` 中，增加根据 `savedDraft.gradingResult` 还原 DOM 元素 `is-correct` 和 `is-incorrect` 类名的逻辑。
+  - 解决了恢复历史解析时，拖拽题等原生 DOM 元素失去红绿对错样式的问题。
+- 创建/修改的文件：
+  - `src/views/exam/PracticeView.vue`
+
+### 阶段 17：修复听力选择题无法统计分数的问题
+- **状态：** complete
+- 执行的操作：
+  - 发现听力 bridge 脚本仅统计 `input.blank`，导致纯选择题听力得分始终为 0/0。
+  - 升级 `calculateScore`，优先通过统计底部导航栏 `.q-nav-item.correct` 的个数来计算得分。
+- 创建/修改的文件：
+  - `src/views/exam/ListeningPracticeView.vue`
+
+### 阶段 18：支持听力双选题拆分为独立计分
+- **状态：** complete
+- 执行的操作：
+  - 用户反馈雅思听力双选题每个选项应算 1 分（共 2 分）。
+  - 再次升级 bridge 脚本，通过在 iframe 中动态注入脚本的方式，提取 `task-configuration` 中的 `CONFIG_DATA`。
+  - 实现了单选算 1 分，多选按正确选项个数拆分计分的精准逻辑。
+- 创建/修改的文件：
+  - `src/views/exam/ListeningPracticeView.vue`
+
+### 阶段 19：修复 Vue 编译器对模板字符串内嵌套 `${}` 误解析的错误
+- **状态：** complete
+- 执行的操作：
+  - 修复了注入脚本中使用反引号和 `${}` 导致 Vue SFC 编译器报错的问题。
+  - 将相关代码重构为普通单引号和 `+` 拼接字符串。
+- 创建/修改的文件：
+  - `src/views/exam/ListeningPracticeView.vue`
 
 ---
 *每个阶段完成后或遇到错误时更新此文件*
