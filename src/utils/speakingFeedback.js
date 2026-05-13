@@ -79,12 +79,12 @@ function calcFluencyBand(words, durationSecs) {
   // 理想区间 100-160 wpm
   let score
   if (wpm < 60) score = 4.0
-  else if (wpm < 90) score = 5.0
-  else if (wpm < 110) score = 5.5
-  else if (wpm < 130) score = 6.0
-  else if (wpm < 150) score = 6.5
-  else if (wpm < 170) score = 7.0
-  else score = 7.5 // 过快可能影响清晰度，不给满
+  else if (wpm < 80) score = 5.0
+  else if (wpm < 100) score = 6.0
+  else if (wpm < 120) score = 7.0
+  else if (wpm < 150) score = 8.0
+  else if (wpm < 180) score = 7.5 // 过快可能影响连贯性和清晰度
+  else score = 7.0 // 语速极快通常会导致发音含糊
 
   // 重复词多说明停顿多 / 填充词多，扣分
   const FILLER_WORDS = ['um', 'uh', 'er', 'like', 'you', 'know', 'basically', 'actually']
@@ -132,10 +132,11 @@ function calcGrammarBand(text) {
   const avgLen = sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length
   // 平均句长 8-20 词被认为语法结构较复杂
   if (avgLen < 5) return 4.5
-  if (avgLen < 8) return 5.0
-  if (avgLen < 12) return 5.5
-  if (avgLen < 18) return 6.0
-  return 6.5
+  if (avgLen < 8) return 5.5
+  if (avgLen < 12) return 6.5
+  if (avgLen < 18) return 7.5
+  if (avgLen < 22) return 8.0
+  return 7.0 // 句子过长（超过22词）在口语中通常显得冗长，略微扣分
 }
 
 /**
@@ -175,22 +176,37 @@ function buildSuggestions({ fluency, vocabulary, grammar, words, durationSecs, p
 }
 
 /**
+ * 将 Whisper 的置信度映射为雅思发音分数
+ * @param {number} confidence 0-1
+ * @returns {number}
+ */
+function mapConfidenceToBand(confidence) {
+  if (confidence > 0.9) return 8.0
+  if (confidence > 0.8) return 7.0
+  if (confidence > 0.7) return 6.0
+  if (confidence > 0.6) return 5.5
+  if (confidence > 0.5) return 5.0
+  return 4.5
+}
+
+/**
  * 对 Speaking 录音转写文本进行规则评分
  *
  * @param {object} params
  * @param {string} params.transcript - 转写全文
  * @param {number} params.durationSecs - 作答总时长（秒）
  * @param {string} params.part - 'Part1' | 'Part2' | 'Part3'
+ * @param {number|null} [params.confidence] - Whisper 置信度
  * @returns {SpeakingFeedback}
  */
-export function calcRuleBasedFeedback({ transcript, durationSecs, part = 'Part2' }) {
+export function calcRuleBasedFeedback({ transcript, durationSecs, part = 'Part2', confidence = null }) {
   const words = tokenize(transcript || '')
   const repeatedWords = findRepeatedWords(words)
 
   const fluency = words.length ? calcFluencyBand(words, durationSecs) : 4.0
   const vocabulary = words.length ? calcVocabularyBand(words) : 4.0
   const grammar = transcript ? calcGrammarBand(transcript) : 4.5
-  const pronunciation = 5.5 // 规则层无法分析发音，给保守中间值
+  const pronunciation = confidence !== null ? mapConfidenceToBand(confidence) : 5.5
 
   const overallBand = Math.round(
     (fluency * WEIGHTS.fluency +
@@ -203,6 +219,14 @@ export function calcRuleBasedFeedback({ transcript, durationSecs, part = 'Part2'
   const wordCount = words.length
   const uniqueWordCount = new Set(words).size
   const wpm = durationSecs > 0 ? Math.round((wordCount / durationSecs) * 60) : 0
+
+  // 额外计算详细指标用于前端分析展示
+  const FILLER_WORDS = ['um', 'uh', 'er', 'like', 'you', 'know', 'basically', 'actually']
+  const fillerCount = words.filter((w) => FILLER_WORDS.includes(w)).length
+  const fillerRatio = wordCount ? fillerCount / wordCount : 0
+  
+  const sentences = (transcript || '').split(/[.!?]+/).filter((s) => s.trim().length > 3)
+  const avgSentenceLength = sentences.length ? wordCount / sentences.length : 0
 
   const suggestions = buildSuggestions({
     fluency,
@@ -228,6 +252,9 @@ export function calcRuleBasedFeedback({ transcript, durationSecs, part = 'Part2'
       wpm,
       durationSecs: Math.round(durationSecs),
       ttr: wordCount ? Math.round(calcTTR(words) * 100) : 0,
+      fillerRatio: Math.round(fillerRatio * 100), // 百分比
+      avgSentenceLength: Math.round(avgSentenceLength * 10) / 10, // 保留一位小数
+      confidence: confidence ? Math.round(confidence * 100) : null, // 百分比
     },
     repeatedWords,
     suggestions,

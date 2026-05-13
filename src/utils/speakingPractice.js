@@ -262,6 +262,7 @@ export function addSessionSegment(session, segment) {
     transcript: segment.transcript ?? '',
     durationSecs: segment.durationSecs ?? 0,
     asrProvider: segment.asrProvider ?? 'unknown',
+    confidence: segment.confidence ?? null,
     timestamp: new Date().toISOString(),
   })
 }

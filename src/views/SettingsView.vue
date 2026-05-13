@@ -43,6 +43,14 @@
           </select>
           <input v-else v-model="settings.ollamaModelSample" type="text" class="input" @blur="saveSettings" placeholder="llama3" />
         </label>
+
+        <label class="setting-item">
+          <span>口语模型 (Speaking)</span>
+          <select v-if="availableModels.length > 0" v-model="settings.ollamaModelSpeaking" class="input" @change="saveSettings">
+            <option v-for="m in availableModels" :key="m.name" :value="m.name">{{ m.name }}</option>
+          </select>
+          <input v-else v-model="settings.ollamaModelSpeaking" type="text" class="input" @blur="saveSettings" placeholder="llama3" />
+        </label>
       </div>
       <div class="actions" v-if="statusMessage">
         <span class="status-message" :class="statusType">{{ statusMessage }}</span>
@@ -59,6 +67,14 @@
           <option value="browser">仅浏览器语音识别</option>
           <option value="local">仅本地 ASR 服务</option>
           <option value="server">仅远端 Server ASR</option>
+        </select>
+      </label>
+
+      <label class="setting-item">
+        <span>默认口语练习模式</span>
+        <select v-model="asrSettings.questionMode" class="input" @change="saveAsrSettings">
+          <option value="read">看题（显示文本，可选朗读）</option>
+          <option value="listen">听题（隐藏文本，自动朗读）</option>
         </select>
       </label>
 
@@ -100,6 +116,7 @@ const settings = ref({
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: 'llama3',
   ollamaModelSample: 'llama3',
+  ollamaModelSpeaking: 'llama3',
 });
 
 const testing = ref(false);
@@ -149,6 +166,7 @@ const asrSettings = ref({
   localAsrBaseUrl: 'http://127.0.0.1:8765',
   serverAsrBaseUrl: '',
   fallbackEnabled: true,
+  questionMode: 'read',
 });
 const asrTesting = ref({ local: false, server: false });
 const asrStatus = ref({ local: null, server: null });

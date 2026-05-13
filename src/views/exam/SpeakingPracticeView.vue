@@ -60,12 +60,22 @@
       <div class="question-card card">
         <div class="question-meta">
           <span class="q-index">Q{{ currentQuestionIndex + 1 }} / {{ questions.length }}</span>
+          
+          <!-- 朗读/看题切换按钮 -->
+          <div class="question-controls" v-if="part !== 'Part2'">
+            <button class="ghost-btn-small" type="button" @click="handleQuestionAction">
+              {{ currentQuestionMode === 'read' ? '🔊 朗读题目' : '👁️ 显示文本' }}
+            </button>
+          </div>
+
           <!-- Part 2 倒计时 -->
           <div v-if="part === 'Part2'" class="speak-timer" :class="{ urgent: speakRemaining <= 20 }">
             {{ formatTime(speakRemaining) }}
           </div>
         </div>
-        <p class="question-text">{{ questions[currentQuestionIndex] }}</p>
+        <p class="question-text" :class="{ 'blurred-text': currentQuestionMode === 'listen' }" @click="currentQuestionMode = 'read'">
+          {{ questions[currentQuestionIndex] }}
+        </p>
       </div>
 
       <!-- 录音控制区 -->
@@ -78,6 +88,11 @@
         <!-- 实时转写 -->
         <div class="transcript-box" v-if="currentTranscript || isRecording">
           <p class="transcript-text">{{ currentTranscript || '正在聆听...' }}</p>
+        </div>
+
+        <!-- 音频回听 -->
+        <div v-if="lastAudioUrl && !isRecording" class="audio-player-area">
+          <audio :src="lastAudioUrl" controls></audio>
         </div>
 
         <!-- 降级提示 -->
@@ -122,11 +137,27 @@
             停止录音
           </button>
 
+          <!-- 重录按钮 -->
+          <button
+            v-if="!isRecording && (currentTranscript || lastAudioUrl)"
+            class="re-record-btn"
+            type="button"
+            @click="reRecord"
+            :disabled="isProcessing"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6"></path>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            重录
+          </button>
+
           <button
             v-if="!isRecording && (currentTranscript || needsManualInput)"
             class="primary-btn next-btn"
             type="button"
             @click="nextQuestion"
+            :disabled="isProcessing"
           >
             {{ isLastQuestion ? '完成练习' : '下一题' }}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -152,7 +183,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   createSpeakingSession,
@@ -166,12 +197,46 @@ import { transcribeWithFallback, ASR_PROVIDER } from '../../utils/speakingAsrRou
 import { stopBrowserAsr } from '../../utils/speakingAsrProviders.js'
 import { calcRuleBasedFeedback, buildFeedbackSummary } from '../../utils/speakingFeedback.js'
 import { saveExamRecord } from '../../utils/examHistory.js'
+import { getSpeakingSettings } from '../../utils/speakingSettings.js'
 
 const router = useRouter()
 const route = useRoute()
 
 const part = route.query.part || 'Part2'
 const topicId = route.query.topicId || ''
+
+// 读取看题/听题设置
+const speakingSettings = getSpeakingSettings()
+const currentQuestionMode = ref(speakingSettings.questionMode || 'read')
+
+function toggleQuestionMode() {
+  currentQuestionMode.value = currentQuestionMode.value === 'read' ? 'listen' : 'read'
+}
+function handleQuestionAction() {
+  if (currentQuestionMode.value === 'read') {
+    currentQuestionMode.value = 'listen'
+    speakText(questions.value[currentQuestionIndex.value])
+  } else {
+    currentQuestionMode.value = 'read'
+    window.speechSynthesis.cancel() // 决定看题时，停止朗读
+  }
+}
+
+function speakText(text, callback) {
+  if (!text) return
+  // 先停止之前的朗读
+  window.speechSynthesis.cancel()
+  
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'en-GB' // 雅思优先用英音
+  utterance.rate = 0.9 // 语速略慢
+  
+  if (callback) {
+    utterance.onend = callback
+  }
+  
+  window.speechSynthesis.speak(utterance)
+}
 
 // 会话与题卡
 const session = ref(null)
@@ -196,6 +261,23 @@ const prepDashOffset = computed(() => {
 // 问答状态
 const currentQuestionIndex = ref(0)
 const questions = ref([])
+
+// 监听题目切换，如果是听题模式则自动朗读
+watch(currentQuestionIndex, (newIdx) => {
+  if (part !== 'Part2') {
+    if (currentQuestionMode.value === 'listen') {
+      // 听题模式：先朗读，读完自动开始录音
+      speakText(questions.value[newIdx], () => {
+        startRecording()
+      })
+    } else {
+      // 看题模式：直接自动开始录音
+      setTimeout(() => {
+        startRecording()
+      }, 100)
+    }
+  }
+})
 const isLastQuestion = computed(() => currentQuestionIndex.value >= questions.value.length - 1)
 
 // 录音状态
@@ -205,6 +287,7 @@ const currentTranscript = ref('')
 const needsManualInput = ref(false)
 const manualText = ref('')
 const fallbackMessage = ref('')
+const lastAudioUrl = ref('')
 
 // ASR 层级
 const lastProviderUsed = ref('')
@@ -235,9 +318,28 @@ async function startMediaRecorder() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     audioChunks = []
-    mediaRecorder = new MediaRecorder(stream)
-    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data)
-    mediaRecorder.start()
+    
+    // 探测浏览器支持的音频格式
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+    let supportedType = ''
+    for (const t of types) {
+      if (MediaRecorder.isTypeSupported(t)) {
+        supportedType = t
+        break
+      }
+    }
+    
+    const options = supportedType ? { mimeType: supportedType } : {}
+    mediaRecorder = new MediaRecorder(stream, options)
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        audioChunks.push(e.data)
+      }
+    }
+    
+    // 启动录音，每 1000 毫秒触发一次 ondataavailable
+    mediaRecorder.start(1000)
   } catch (e) {
     // 麦克风权限被拒
     needsManualInput.value = true
@@ -249,7 +351,8 @@ function stopMediaRecorder() {
   return new Promise((resolve) => {
     if (!mediaRecorder) { resolve(null); return }
     mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, { type: 'audio/webm' })
+      const mime = mediaRecorder.mimeType || 'audio/webm'
+      const blob = new Blob(audioChunks, { type: mime })
       // 停止所有轨道
       mediaRecorder.stream.getTracks().forEach((t) => t.stop())
       resolve(blob)
@@ -270,9 +373,18 @@ async function startRecording() {
 async function stopRecording() {
   isProcessing.value = true
   isRecording.value = false
+  
+  // 停止 Part 2 倒计时
+  if (speakTimer) {
+    clearInterval(speakTimer)
+  }
 
   const durationSecs = (Date.now() - recordingStartTime) / 1000
   const audioBlob = await stopMediaRecorder()
+  if (audioBlob) {
+    if (lastAudioUrl.value) URL.revokeObjectURL(lastAudioUrl.value)
+    lastAudioUrl.value = URL.createObjectURL(audioBlob)
+  }
   stopBrowserAsr()
 
   try {
@@ -291,6 +403,7 @@ async function stopRecording() {
         transcript: result.text,
         durationSecs,
         asrProvider: result.providerUsed,
+        confidence: result.confidence,
       })
       if (result.fallbackTrace.length > 0) {
         const used = result.providerUsed
@@ -303,6 +416,32 @@ async function stopRecording() {
   } finally {
     isProcessing.value = false
   }
+}
+function reRecord() {
+  // 停止当前的录音和计时（防呆）
+  if (isRecording.value) {
+    stopBrowserAsr()
+    isRecording.value = false
+  }
+  if (speakTimer) {
+    clearInterval(speakTimer)
+  }
+  
+  // 重置状态
+  speakRemaining.value = 120 // SPEAK_TOTAL 在上面定义了
+  currentTranscript.value = ''
+  lastAudioUrl.value = ''
+  manualText.value = ''
+  needsManualInput.value = false
+  fallbackMessage.value = ''
+  
+  // 重新开始计时
+  if (part === 'Part2') startSpeakTimer()
+  
+  // 重新开始录音
+  setTimeout(() => {
+    startRecording()
+  }, 100)
 }
 
 function nextQuestion() {
@@ -324,6 +463,8 @@ function nextQuestion() {
   currentQuestionIndex.value++
   currentTranscript.value = ''
   manualText.value = ''
+  if (lastAudioUrl.value) URL.revokeObjectURL(lastAudioUrl.value)
+  lastAudioUrl.value = ''
   needsManualInput.value = false
   fallbackMessage.value = ''
 }
@@ -335,7 +476,14 @@ async function finishPractice() {
   const transcript = getSessionFullTranscript(session.value)
   const durationSecs = getSessionTotalDuration(session.value)
 
-  const feedback = calcRuleBasedFeedback({ transcript, durationSecs, part })
+  // 计算平均置信度
+  const segments = session.value.segments || []
+  const validSegments = segments.filter(s => s.confidence !== null && s.confidence !== undefined)
+  const avgConfidence = validSegments.length > 0 
+    ? validSegments.reduce((sum, s) => sum + s.confidence, 0) / validSegments.length 
+    : null
+
+  const feedback = calcRuleBasedFeedback({ transcript, durationSecs, part, confidence: avgConfidence })
   const feedbackSummary = buildFeedbackSummary(feedback)
 
   // 保存到历史
@@ -370,7 +518,27 @@ async function finishPractice() {
 function startSpeaking() {
   clearInterval(prepTimer)
   phase.value = 'speaking'
-  if (part === 'Part2') startSpeakTimer()
+  
+  if (part === 'Part2') {
+    startSpeakTimer()
+    // Part 2 不需要朗读，直接自动开始录音
+    setTimeout(() => {
+      startRecording()
+    }, 100)
+  } else {
+    // Part 1 / Part 3
+    if (currentQuestionMode.value === 'listen') {
+      // 听题模式：先朗读题目，朗读结束后自动开始录音
+      speakText(questions.value[currentQuestionIndex.value], () => {
+        startRecording()
+      })
+    } else {
+      // 看题模式：直接自动开始录音
+      setTimeout(() => {
+        startRecording()
+      }, 100)
+    }
+  }
 }
 
 function startPrepTimer() {
@@ -697,6 +865,14 @@ onUnmounted(() => {
   min-height: 60px;
 }
 
+.audio-player-area {
+  width: 100%;
+}
+.audio-player-area audio {
+  width: 100%;
+  height: 40px;
+}
+
 .transcript-text {
   font-size: 0.9rem;
   line-height: 1.6;
@@ -764,6 +940,32 @@ onUnmounted(() => {
 .record-btn:hover { opacity: 0.88; }
 .record-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.re-record-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: #f1f3f5;
+  color: #495057;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: 1px solid #ced4da;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.re-record-btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+  color: #212529;
+}
+
+.re-record-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .stop-btn {
   display: flex;
   align-items: center;
@@ -814,5 +1016,40 @@ onUnmounted(() => {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin { to { transform: rotate(360deg); } }/* 听题模式样式 */
+.question-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.ghost-btn-small {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ghost-btn-small:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.blurred-text {
+  filter: blur(6px);
+  user-select: none;
+  cursor: pointer;
+  transition: filter 0.3s ease;
+}
+
+.blurred-text:hover {
+  filter: blur(4px); /* 悬浮时稍微清晰一点，提示可点击 */
+}
 </style>

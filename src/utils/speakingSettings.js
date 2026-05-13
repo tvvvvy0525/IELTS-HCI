@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS = {
   serverAsrBaseUrl: '',
   // 是否允许自动降级
   fallbackEnabled: true,
+  // 默认练习模式：read(看题) | listen(听题)
+  questionMode: 'read',
 }
 
 /**

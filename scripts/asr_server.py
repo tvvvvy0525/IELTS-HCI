@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
 import uvicorn
 import os
+import tempfile
 
 app = FastAPI(title="SHUI IELTS Local ASR Service")
 
@@ -16,15 +17,12 @@ app.add_middleware(
 )
 
 # 初始化 Whisper 模型
-# "base" 模型大小适中（约 140MB），准确率不错，适合 CPU 运行。
-# 如果性能不够，可以换成 "tiny"；如果追求更高准确率，可以换成 "small" 或 "medium"。
 print("Loading Whisper model...")
-model = WhisperModel("base", device="cpu", compute_type="int8")
+model = WhisperModel("small", device="cpu", compute_type="int8")
 print("Model loaded successfully!")
 
 @app.get("/health")
 def health():
-    """健康检查接口，前端用来检测服务是否在线"""
     return {"status": "ok", "service": "Local ASR"}
 
 @app.post("/transcribe")
@@ -33,30 +31,58 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form("en")):
     转写接口
     接收 multipart/form-data 格式的音频文件
     """
-    # 保存上传的 WebM 音频文件为临时文件
-    temp_filename = "temp_recording.webm"
+    temp_file_path = None
     try:
         content = await file.read()
-        with open(temp_filename, "wb") as f:
-            f.write(content)
+        print(f"\n[ASR] 收到音频文件: {file.filename}, 大小: {len(content)} 字节")
         
-        # 使用 faster-whisper 进行转写
-        # beam_size=5 是默认值，增大可以提高准确率但变慢
-        segments, info = model.transcribe(temp_filename, language=lang, beam_size=5)
+        if len(content) < 1000:
+            print("[ASR] 警告：音频文件过小，可能没有录入声音。")
+            
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
         
-        text = "".join([segment.text for segment in segments])
+        # whisper 只接受 2 位的语言代码
+        clean_lang = lang[:2] if len(lang) > 2 else lang
+        
+        print(f"[ASR] 开始转写，指定语言: {clean_lang} (原参数: {lang})...")
+        # 开启 word_timestamps=True 以获取词级置信度
+        segments, info = model.transcribe(temp_file_path, language=clean_lang, beam_size=5, word_timestamps=True)
+        
+        print(f"[ASR] 探测语种: {info.language} (概率: {info.language_probability:.2f})")
+        
+        total_prob = 0.0
+        word_count = 0
+        text_parts = []
+        
+        # 遍历片段和单词，累加置信度
+        for segment in segments:
+            text_parts.append(segment.text)
+            if segment.words:
+                for word in segment.words:
+                    total_prob += word.probability
+                    word_count += 1
+        
+        # 计算平均置信度
+        avg_confidence = total_prob / word_count if word_count > 0 else 0.0
+        text = "".join(text_parts)
+        
+        print(f"[ASR] 识别出 {word_count} 个单词，平均置信度: {avg_confidence:.2f}")
+        print(f"[ASR] 最终文本: {text.strip()}")
         
         return {
             "text": text.strip(),
-            "confidence": 1.0, # faster-whisper 不直接返回整体置信度，这里填 1.0
+            "confidence": avg_confidence,
             "language": info.language
         }
     except Exception as e:
-        return {"error": str(e), "text": ""}
+        print(f"[ASR] 转写过程发生错误: {e}")
+        return {"error": str(e), "text": "", "confidence": 0.0}
     finally:
-        # 无论成功失败，都清理临时文件
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
+        # 清理临时文件
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 if __name__ == "__main__":
     # 启动服务，监听 8765 端口

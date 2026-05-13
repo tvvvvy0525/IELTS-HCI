@@ -16,12 +16,7 @@ const defaultData = {
   }
 };
 
-// 响应式状态
-const state = reactive(loadData());
-
 // 计算总词数
-const totalWordCount = calculateTotalWords();
-
 function calculateTotalWords() {
   let count = 0;
   for (const topic in vocabulary) {
@@ -34,6 +29,8 @@ function calculateTotalWords() {
   }
   return count;
 }
+
+const totalWordCount = calculateTotalWords();
 
 // 从 localStorage 加载数据
 function loadData() {
@@ -57,6 +54,9 @@ function loadData() {
   
   return data;
 }
+
+// 响应式状态
+const state = reactive(loadData());
 
 // 获取今天的日期字符串 YYYY-MM-DD
 function getTodayStr() {
