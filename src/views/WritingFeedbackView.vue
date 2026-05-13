@@ -43,15 +43,33 @@
         <section class="card" v-if="aiSettings.provider === 'ollama'">
           <div class="section-header" style="justify-content: flex-start; gap: 16px;">
             <h3>Ollama 自动批改</h3>
-            <button 
-              class="primary-btn" 
-              type="button" 
-              @click="doAutoGrade" 
+            <button
+              class="primary-btn"
+              type="button"
+              @click="doAutoGrade"
               :disabled="!practice || isAutoGrading"
             >
               {{ isAutoGrading ? '批改中...' : '开始自动批改' }}
             </button>
-            <span class="hint" style="margin: 0 0 0 auto;">当前模型: {{ aiSettings.ollamaModel }}</span>
+            <div style="margin: 0 0 0 auto; display: flex; align-items: center; gap: 8px;">
+              <span class="hint">切换模型:</span>
+              <select 
+                v-model="aiSettings.ollamaModel" 
+                class="input" 
+                style="padding: 4px 8px; font-size: 12px; width: 140px;"
+                @change="saveModelChange"
+              >
+                <option v-for="model in ollamaModels" :key="model" :value="model">{{ model }}</option>
+                <option v-if="ollamaModels.length === 0" value="llama3">llama3</option>
+                <option v-if="ollamaModels.length === 0" value="qwen">qwen</option>
+              </select>
+              
+              <span v-if="ollamaConnected" style="color: #52c41a; font-size: 12px; font-weight: 600;">正常连接</span>
+              <div v-else style="display: flex; align-items: center; gap: 4px;">
+                <span style="color: #ef4444; font-size: 12px; font-weight: 600;">无法连接</span>
+                <button class="ghost-btn-small" style="font-size: 12px; padding: 2px 6px;" @click="showOllamaFixModal = true">修复</button>
+              </div>
+            </div>
           </div>
           <div v-if="isAutoGrading" class="progress-panel">
             <div class="progress-meta">
@@ -113,7 +131,7 @@
 
         <section class="card">
           <h3>解析结果</h3>
-          
+
           <div class="score-display">
             <div class="score-item">
               <span class="score-label">总分</span>
@@ -146,7 +164,7 @@
               <div class="label">原文</div>
               <div class="original-essay-content" v-html="highlightedOriginalEssay"></div>
             </div>
-            
+
             <div class="review-right">
               <div class="feedback-section" v-if="feedback.strengths && feedback.strengths.length > 0">
                 <div class="label" style="color: #10b981;">优点</div>
@@ -157,7 +175,7 @@
                   </li>
                 </ul>
               </div>
-              
+
               <div class="feedback-section" v-if="feedback.issues && feedback.issues.length > 0">
                 <div class="label" style="color: #ef4444;">问题</div>
                 <ul class="feedback-list">
@@ -167,7 +185,7 @@
                   </li>
                 </ul>
               </div>
-              
+
               <div class="feedback-section" v-if="feedback.rewriteSuggestions && feedback.rewriteSuggestions.length > 0">
                 <div class="label" style="color: #3b82f6;">改写建议</div>
                 <ul class="feedback-list">
@@ -180,13 +198,33 @@
             </div>
           </div>
 
-          <div class="actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light);">
+          <div class="actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light); display: flex; align-items: center; gap: 12px;">
             <button class="primary-btn" type="button" @click="doGenerateSampleEssay" :disabled="!practice || isGeneratingSample || !feedback.bandOverall">
               {{ isGeneratingSample ? '正在生成范文...' : '生成范文' }}
             </button>
-            <span class="hint" style="line-height: 38px; margin-left: 12px;" v-if="sampleEssayMessage" :class="{'error-text': sampleEssayError}">
+            <span class="hint" style="line-height: 38px;" v-if="sampleEssayMessage" :class="{'error-text': sampleEssayError}">
               {{ sampleEssayMessage }}
             </span>
+            
+            <div style="margin: 0 0 0 auto; display: flex; align-items: center; gap: 8px;">
+              <span class="hint" style="font-size: 12px;">切换模型:</span>
+              <select 
+                v-model="aiSettings.ollamaModelSample" 
+                class="input" 
+                style="padding: 4px 8px; font-size: 12px; width: 140px;"
+                @change="saveModelChange"
+              >
+                <option v-for="model in ollamaModels" :key="model" :value="model">{{ model }}</option>
+                <option v-if="ollamaModels.length === 0" value="llama3">llama3</option>
+                <option v-if="ollamaModels.length === 0" value="qwen">qwen</option>
+              </select>
+              
+              <span v-if="ollamaConnected" style="color: #52c41a; font-size: 12px; font-weight: 600;">正常连接</span>
+              <div v-else style="display: flex; align-items: center; gap: 4px;">
+                <span style="color: #ef4444; font-size: 12px; font-weight: 600;">无法连接</span>
+                <button class="ghost-btn-small" style="font-size: 12px; padding: 2px 6px;" @click="showOllamaFixModal = true">修复</button>
+              </div>
+            </div>
           </div>
 
           <div class="markdown-body" v-if="feedback.sampleEssay || feedback.sampleEssayThinking || isGeneratingSample" style="margin-top: 16px; padding: 16px; background: var(--surface-hover); border-radius: 8px;">
@@ -196,7 +234,7 @@
               <div style="margin-top: 8px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 6px; white-space: pre-wrap; font-family: monospace;">{{ feedback.sampleEssayThinking }}</div>
             </details>
             <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);">
-              <div class="md-content" v-if="feedback.sampleEssay" v-html="renderedSampleEssay"></div>
+              <div class="md-content" v-if="feedback.sampleEssay" v-html="renderedSampleEssay" @mouseover="handleMarkdownMouseOver" @mouseout="handleMarkdownMouseOut"></div>
               <template v-else-if="isGeneratingSample && !feedback.sampleEssayThinking"><span style="color: var(--text-muted); font-style: italic;">等待模型连接...</span></template>
             </div>
           </div>
@@ -218,6 +256,65 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <!-- Ollama 修复弹窗 -->
+    <div v-if="showOllamaFixModal" class="wizard-backdrop" @click="showOllamaFixModal = false">
+      <div class="wizard-card" @click.stop style="max-width: 500px;">
+        <h3 style="margin-top: 0;">Ollama 连接修复</h3>
+        <div style="margin: 20px 0; font-size: 14px; line-height: 1.6;">
+          <p>系统无法连接到您本地的 Ollama 服务。请按以下步骤检查：</p>
+          <ol style="padding-left: 20px; margin: 10px 0;">
+            <li>确保您已在电脑上启动了 Ollama 应用程序。</li>
+            <li>如果您的 Ollama 运行在非默认端口，请修改下方地址。</li>
+          </ol>
+
+          <!-- Ollama 地址动画演示 -->
+          <div class="ollama-guide-animation">
+            <p class="hint">默认地址为 <code>http://127.0.0.1:11434</code>。您可以在浏览器中访问它，如果看到以下画面，说明地址正确：</p>
+            <div class="browser-demo">
+              <div class="address-bar-mock">
+                <div class="lock-icon-mock">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <span class="url-mock">http://127.0.0.1:11434</span>
+              </div>
+              <div class="page-content-mock">
+                <span class="typing-text">Ollama is running</span>
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-top: 10px; text-align: right;">
+            <a href="#" style="font-size: 12px; color: var(--accent); text-decoration: none;" @click.prevent="showPortHelp = !showPortHelp">
+              {{ showPortHelp ? '收起帮助' : '如何查看我的 Ollama 端口？' }}
+            </a>
+          </div>
+          
+          <div v-if="showPortHelp" style="margin-top: 10px; padding: 10px; background: var(--surface-hover); border-radius: 6px; font-size: 12px; color: var(--text-secondary); border: 1px solid var(--border-light);">
+            <p style="margin-top: 0;"><strong>1. 绝大多数情况（小白推荐）</strong></p>
+            <p>如果您是直接双击打开官方 App 运行的，端口必定是默认的 <code>11434</code>。</p>
+            <p style="margin-top: 8px;"><strong>2. 终端启动情况</strong></p>
+            <p>如果您是在终端运行 <code>ollama serve</code> 启动的，请看终端的输出日志，寻找类似 <code>Listening on 127.0.0.1:XXXX</code> 的字样，后面的数字就是端口。</p>
+            <p style="margin-top: 8px;"><strong>3. 环境变量修改</strong></p>
+            <p>如果您设置了环境变量 <code>OLLAMA_HOST</code>，请使用您自定义设置的端口。</p>
+          </div>
+          
+          <div style="margin-top: 15px;">
+            <label style="font-weight: 600;">本地 Ollama 地址：</label>
+            <input 
+              v-model="aiSettings.ollamaBaseUrl" 
+              class="input" 
+              style="width: 100%; margin-top: 5px;" 
+              placeholder="http://127.0.0.1:11434"
+            />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="ghost-btn" @click="showOllamaFixModal = false">取消</button>
+          <button class="primary-btn" @click="saveOllamaFix">保存并测试</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -244,7 +341,7 @@ import {
   setFeedbackList,
   upsertFeedbackById,
 } from '../utils/writingFeedback.js'
-import { getAiSettings, AI_SETTINGS_UPDATED_EVENT } from '../utils/writingAiSettings.js'
+import { getAiSettings, setAiSettings, AI_SETTINGS_UPDATED_EVENT } from '../utils/writingAiSettings.js'
 import { autoGradeWriting, autoGenerateSampleEssay } from '../utils/writingAiClient.js'
 
 const route = useRoute()
@@ -316,6 +413,26 @@ function escapeHtml(unsafe) {
     .replace(/'/g, '&#039;')
 }
 
+function handleMarkdownMouseOver(e) {
+  const target = e.target.closest('li, p');
+  if (target) {
+    const text = target.innerText;
+    // 只有当文本中包含英文时才触发
+    if (/[a-zA-Z]/.test(text)) {
+      hoveredFeedbackText.value = text;
+    }
+  }
+}
+
+function handleMarkdownMouseOut(e) {
+  const target = e.target.closest('li, p');
+  if (target) {
+    if (hoveredFeedbackText.value === target.innerText) {
+      hoveredFeedbackText.value = null;
+    }
+  }
+}
+
 function extractEnglishPhrases(text) {
   if (!text) return []
   const matches = text.match(/[a-zA-Z\s,.'"-]{10,}/g)
@@ -328,7 +445,7 @@ function extractEnglishPhrases(text) {
 const highlightedOriginalEssay = computed(() => {
   const text = originalEssayText.value
   if (!text) return ''
-  
+
   if (!hoveredFeedbackText.value) {
     return escapeHtml(text).replace(/\n/g, '<br/>')
   }
@@ -339,7 +456,7 @@ const highlightedOriginalEssay = computed(() => {
   if (englishPhrases.length > 0) {
     englishPhrases.sort((a, b) => b.length - a.length)
     const lowerText = text.toLowerCase()
-    
+
     for (const phrase of englishPhrases) {
       const lowerPhrase = phrase.toLowerCase()
       let matchIdx = lowerText.indexOf(lowerPhrase)
@@ -394,8 +511,37 @@ function refreshData() {
   }
 }
 
-function refreshAiSettings() {
-  aiSettings.value = getAiSettings()
+function saveModelChange() {
+  setAiSettings(aiSettings.value)
+}
+
+const ollamaModels = ref([])
+const ollamaConnected = ref(false)
+const showOllamaFixModal = ref(false)
+const showPortHelp = ref(false)
+
+async function fetchOllamaModels() {
+  if (aiSettings.value.provider !== 'ollama') return
+  
+  const baseUrl = aiSettings.value.ollamaBaseUrl || 'http://127.0.0.1:11434'
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, { cache: 'no-cache' })
+    if (res.ok) {
+      const data = await res.json()
+      ollamaModels.value = data.models.map(m => m.name)
+      ollamaConnected.value = true
+    } else {
+      ollamaConnected.value = false
+    }
+  } catch (err) {
+    ollamaConnected.value = false
+  }
+}
+
+function saveOllamaFix() {
+  setAiSettings(aiSettings.value)
+  showOllamaFixModal.value = false
+  fetchOllamaModels()
 }
 
 const autoGradeStageLabel = computed(() => {
@@ -451,7 +597,7 @@ async function doAutoGrade() {
         autoGradeMessage.value = message;
       },
     });
-    
+
     // 成功后回写结果
     const parsed = result.parsed;
     feedback.value.bandOverall = parsed.bandOverall;
@@ -463,11 +609,11 @@ async function doAutoGrade() {
     feedback.value.rawJson = result.rawJson;
     feedback.value.parseMode = parsed.parseMode || '';
     feedback.value.parsedAt = new Date().toISOString();
-    
+
     saveFeedback('ai');
-    
-    autoGradeMessage.value = parsed.strictError 
-      ? `自动批改完成。严格解析失败，已使用容错解析。` 
+
+    autoGradeMessage.value = parsed.strictError
+      ? `自动批改完成。严格解析失败，已使用容错解析。`
       : '自动批改并解析保存完成！';
   } catch (err) {
     autoGradeError.value = true;
@@ -490,20 +636,20 @@ async function doGenerateSampleEssay() {
         feedback.value.sampleEssay = resText;
         feedback.value.sampleEssayThinking = thinkText;
         if (thinkText && !resText) {
-          sampleEssayMessage.value = `AI 深度思考中 (已思考 ${thinkText.length} 字符)...`;
+          sampleEssayMessage.value = `AI 深度思考中...`;
         } else if (resText) {
-          sampleEssayMessage.value = `正在生成范文，已返回 ${resText.length} 个字符...`;
+          sampleEssayMessage.value = `正在生成范文...`;
         }
       },
       onStatus(stage, message) {
         sampleEssayMessage.value = message;
       },
     });
-    
+
     feedback.value.sampleEssay = result;
     feedback.value.updatedAt = new Date().toISOString();
     saveFeedback('ai');
-    
+
     sampleEssayMessage.value = '范文生成并保存成功！';
   } catch (err) {
     sampleEssayError.value = true;
@@ -633,16 +779,27 @@ watch(
   { immediate: true },
 )
 
+function refreshAiSettings() {
+  aiSettings.value = getAiSettings()
+  fetchOllamaModels()
+}
+
+let ollamaTimer = null
+
 onMounted(() => {
   window.addEventListener('storage', refreshData)
   window.addEventListener(WRITING_PRACTICES_UPDATED_EVENT, refreshData)
   window.addEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshData)
   window.addEventListener(EXAM_HISTORY_UPDATED_EVENT, refreshData)
   window.addEventListener(AI_SETTINGS_UPDATED_EVENT, refreshAiSettings)
+  
+  fetchOllamaModels() // 自动连接测试并获取模型
+  ollamaTimer = setInterval(fetchOllamaModels, 10000) // 每10秒检测一次
 })
 
 onUnmounted(() => {
   stopAutoGradeTimer()
+  if (ollamaTimer) clearInterval(ollamaTimer)
   window.removeEventListener('storage', refreshData)
   window.removeEventListener(WRITING_PRACTICES_UPDATED_EVENT, refreshData)
   window.removeEventListener(WRITING_FEEDBACK_UPDATED_EVENT, refreshData)
@@ -997,4 +1154,123 @@ onUnmounted(() => {
 .md-content :deep(pre code) { background: transparent; padding: 0; color: inherit; }
 .md-content :deep(strong) { font-weight: 600; color: var(--text); }
 .md-content :deep(blockquote) { border-left: 4px solid #d0d7de; margin: 16px 0; padding-left: 16px; color: var(--text-muted); font-style: italic; }
+
+.ghost-btn-small {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ghost-btn-small:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.green { background-color: #52c41a; }
+.status-dot.red { background-color: #ff4d4f; }
+
+/* 修复弹窗样式 */
+.wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 20, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2200;
+}
+
+.wizard-card {
+  width: min(500px, 92vw);
+  padding: 22px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+}
+
+/* Ollama 动画样式 */
+.ollama-guide-animation {
+  margin-top: 15px;
+  background: var(--surface-hover);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.ollama-guide-animation .hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.browser-demo {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.address-bar-mock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-hover);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.lock-icon-mock {
+  color: #52c41a;
+}
+
+.url-mock {
+  font-family: monospace;
+}
+
+.page-content-mock {
+  padding: 15px;
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  height: calc(100% - 31px);
+}
+
+.typing-text {
+  border-right: 2px solid var(--text);
+  white-space: nowrap;
+  animation: typing 3s steps(17, end) infinite, blink-caret 0.75s step-end infinite;
+  overflow: hidden;
+  max-width: 0;
+}
+
+@keyframes typing {
+  from { max-width: 0; }
+  to { max-width: 150px; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: var(--text); }
+}
 </style>
