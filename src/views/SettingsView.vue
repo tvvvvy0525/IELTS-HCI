@@ -3,11 +3,16 @@
     <h2>系统设置</h2>
     <label class="setting-item">
       <span>目标分数</span>
-      <select class="input">
-        <option>Band 6.0</option>
-        <option selected>Band 6.5</option>
-        <option>Band 7.0+</option>
+      <select v-model="goals.targetBand" class="input" @change="saveGoals">
+        <option value="6.0">Band 6.0</option>
+        <option value="6.5">Band 6.5</option>
+        <option value="7.0">Band 7.0</option>
+        <option value="7.5">Band 7.5</option>
       </select>
+    </label>
+    <label class="setting-item">
+      <span>考试日期</span>
+      <input v-model="goals.examDate" type="date" class="input" @change="saveGoals" />
     </label>
     <label class="setting-item">
       <span>AI 反馈模式</span>
@@ -60,6 +65,7 @@
     <!-- ASR / Speaking 配置 -->
     <div class="asr-settings">
       <h3 class="section-title">口语 / ASR 配置</h3>
+      <p class="section-desc">建议优先使用“自动”，练习时会优先用你配置的语音服务；服务不可用时自动切换到浏览器语音输入。</p>
       <label class="setting-item">
         <span>ASR 策略</span>
         <select v-model="asrSettings.asrMode" class="input" @change="saveAsrSettings">
@@ -84,6 +90,7 @@
           <input v-model="asrSettings.localAsrBaseUrl" type="text" class="input address-input" @blur="saveAsrSettings" placeholder="http://127.0.0.1:8765" />
           <button class="primary-btn" @click="testLocalAsr" :disabled="asrTesting.local">{{ asrTesting.local ? '检测中...' : '健康检查' }}</button>
         </div>
+        <span class="status-message">本地 ASR 需要手动启动程序后才能使用，例如：`python scripts/asr_server.py`。</span>
         <span v-if="asrStatus.local !== null" class="status-message" :class="asrStatus.local ? 'success' : 'error'">{{ asrStatus.local ? '本地 ASR 在线 ✓' : '本地 ASR 不可用' }}</span>
       </div>
 
@@ -110,6 +117,8 @@ import { getAiSettings, setAiSettings } from '../utils/writingAiSettings.js';
 import { pingOllama, listOllamaModels } from '../utils/writingAiOllama.js';
 import { getSpeakingSettings, setSpeakingSettings } from '../utils/speakingSettings.js';
 import { pingLocalAsr, pingServerAsr } from '../utils/speakingAsrProviders.js';
+import { getUserGoals, setUserGoals } from '../utils/userGoals.js';
+import { vocabularyStore } from '../utils/vocabularyStore.js';
 
 const settings = ref({
   provider: 'manual',
@@ -123,11 +132,20 @@ const testing = ref(false);
 const statusMessage = ref('');
 const statusType = ref('');
 const availableModels = ref([]);
+const goals = ref({
+  targetBand: '6.5',
+  examDate: '',
+});
 
 
 
 function saveSettings() {
   setAiSettings(settings.value);
+}
+
+function saveGoals() {
+  setUserGoals(goals.value);
+  vocabularyStore.setExamDate(goals.value.examDate || '');
 }
 
 async function testConnection() {
@@ -174,6 +192,7 @@ const asrStatus = ref({ local: null, server: null });
 onMounted(() => {
   const current = getAiSettings();
   settings.value = { ...current };
+  goals.value = { ...getUserGoals() };
   const asrCurrent = getSpeakingSettings();
   asrSettings.value = { ...asrCurrent };
 });
@@ -275,6 +294,12 @@ async function testServerAsr() {
   font-weight: 700;
   color: var(--text);
   margin: 0 0 4px;
+}
+.section-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 .toggle-item {
   flex-direction: row;

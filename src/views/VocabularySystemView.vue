@@ -55,7 +55,7 @@
     <!-- 核心指标 Grid -->
     <div class="metrics-grid">
       <!-- 计划考试日期 -->
-      <div class="card metric-item clickable-card">
+      <div class="card metric-item clickable-card" @click="openExamDatePicker">
         <div class="metric-icon-wrap calendar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="4" width="18" height="16" rx="2" ry="2"/>
@@ -66,10 +66,17 @@
         </div>
         <div class="metric-info">
           <p class="eyebrow">考试计划</p>
-          <div class="date-setter" v-if="isEditingDate">
-            <input type="date" v-model="tempExamDate" @blur="saveExamDate" @keyup.enter="saveExamDate" ref="dateInput" />
+          <div class="date-setter" v-if="isEditingDate" @click.stop>
+            <input
+              type="date"
+              v-model="tempExamDate"
+              @blur="saveExamDate"
+              @keyup.enter="saveExamDate"
+              ref="dateInput"
+              @click.stop
+            />
           </div>
-          <h3 v-else @click="startEditingDate" class="editable-title">
+          <h3 v-else class="editable-title">
             {{ state.examDate || '点击设置日期' }}
             <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </h3>
@@ -225,6 +232,16 @@ function startEditingDate() {
   nextTick(() => {
     if (dateInput.value) {
       dateInput.value.focus();
+    }
+  });
+}
+
+function openExamDatePicker() {
+  startEditingDate();
+  nextTick(() => {
+    if (!dateInput.value) return;
+    if (typeof dateInput.value.showPicker === 'function') {
+      dateInput.value.showPicker();
     }
   });
 }
