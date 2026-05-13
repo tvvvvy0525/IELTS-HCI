@@ -1,3 +1,5 @@
+import { task1Exemplars, task2Exemplars } from './writingExemplars.js'
+
 const WRITING_PRACTICES_KEY = 'writing_practices_v1'
 export const WRITING_PRACTICES_UPDATED_EVENT = 'writing-practices-updated'
 
@@ -201,14 +203,29 @@ export function upsertById(list, item) {
 }
 
 export function getSeedPrompts() {
-  return {
-    task1: [
-      'The chart below shows changes in the percentage of households owning three types of electronic device between 2000 and 2020. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
-      'The graph below compares the number of overseas visitors to three different museums in a European city between 1995 and 2015. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
-    ],
-    task2: [
-      'Some people believe that universities should focus on providing practical skills for the workplace, while others think higher education should concentrate on academic knowledge. Discuss both views and give your own opinion.',
-      'In many countries, people are living and working longer than ever before. Do the advantages of this trend outweigh the disadvantages?',
-    ],
+  const base = {
+    task1: task1Exemplars.map(e => ({
+      id: e.id,
+      prompt: e.question,
+      image: e.image,
+      title: e.title,
+      type: e.type
+    })),
+    task2: task2Exemplars.map(e => ({
+      id: e.id,
+      prompt: e.question,
+      title: e.title,
+      topic: e.topic
+    }))
+  }
+  
+  try {
+    const custom = JSON.parse(localStorage.getItem('writing_custom_questions') || '{"task1":[], "task2":[]}')
+    return {
+      task1: [...base.task1, ...custom.task1],
+      task2: [...base.task2, ...custom.task2]
+    }
+  } catch (e) {
+    return base
   }
 }

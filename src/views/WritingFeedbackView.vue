@@ -201,6 +201,22 @@
             </div>
           </div>
         </section>
+
+        <!-- 静态范文库展示 -->
+        <section class="card" v-if="currentExemplar" style="margin-top: 16px;">
+          <h3>参考范文 (范文库)</h3>
+          <div class="markdown-body" style="padding: 16px; background: var(--surface-hover); border-radius: 8px;">
+            <div style="font-weight: 700; margin-bottom: 8px;">{{ currentExemplar.title }}</div>
+            <div style="white-space: pre-wrap; font-family: inherit; margin-bottom: 16px; color: var(--text-secondary);">
+              {{ currentExemplar.sample }}
+            </div>
+            <div style="border-top: 1px solid var(--border-light); margin-bottom: 16px;"></div>
+            <div>
+              <div style="font-weight: 700; margin-bottom: 8px;">范文解析</div>
+              <div class="md-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);" v-html="renderedExemplarNotes"></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -210,6 +226,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
+import { task1Exemplars } from '../utils/writingExemplars.js'
 import { EXAM_HISTORY_UPDATED_EVENT, saveExamRecord } from '../utils/examHistory.js'
 import {
   WRITING_PRACTICES_UPDATED_EVENT,
@@ -260,6 +277,19 @@ const submittedPractices = computed(() =>
 )
 
 const practice = computed(() => submittedPractices.value.find((p) => p.id === selectedPracticeId.value))
+
+const currentExemplar = computed(() => {
+  if (!practice.value) return null
+  if (practice.value.promptId) {
+    return task1Exemplars.find(e => e.id === practice.value.promptId) || null
+  }
+  return task1Exemplars.find(e => e.question === practice.value.prompt) || null
+})
+
+const renderedExemplarNotes = computed(() => {
+  if (!currentExemplar.value) return ''
+  return marked.parse(currentExemplar.value.notes)
+})
 
 const renderedCommentsMd = computed(() => {
   if (!feedback.value.commentsMd) return ''

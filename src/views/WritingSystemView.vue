@@ -1,103 +1,293 @@
 <template>
   <div class="writing-page">
-    <section class="catalog-header card">
+    <section class="catalog-header card" style="display: flex; justify-content: space-between; align-items: center;">
       <div>
         <p class="eyebrow">Writing</p>
         <h2>写作练习</h2>
-        <p>先提供可直接开写的练笔编辑器。题库资源后续再逐步补齐，目前支持手动题目输入与内置示例题。</p>
+        <p>选择题目开始练笔，或录入新题进行练习。系统将保存您的草稿并提供范文参考。</p>
       </div>
-      <div class="catalog-count">
-        <strong>{{ sortedPractices.length }}</strong>
-        <span>篇草稿</span>
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <div class="catalog-count">
+          <strong>{{ sortedPractices.length }}</strong>
+          <span>篇草稿</span>
+        </div>
+        <button v-if="viewMode === 'library'" class="ghost-btn" type="button" @click="addNewQuestion">录入新题</button>
+        <button class="ghost-btn" type="button" @click="viewMode === 'library' ? goBack() : viewMode = 'library'">
+          {{ viewMode === 'library' ? '返回首页' : '返回题库' }}
+        </button>
       </div>
     </section>
 
-    <div class="writing-grid">
-      <aside class="card writing-sidebar">
-        <div class="sidebar-top">
-          <div>
-            <div class="sidebar-title">练笔历史</div>
-            <div class="sidebar-subtitle">草稿与已提交写作会保存在本地</div>
+    <!-- Library Mode -->
+    <div v-if="viewMode === 'library'" class="writing-library card" style="padding: 20px;">
+      <div class="library-columns" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+        <!-- Task 1 Column -->
+        <div class="library-column">
+          <h3 style="margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">Task 1 题库</h3>
+          <ul class="question-list" style="list-style: none; padding: 0;">
+            <li v-for="q in seedPrompts.task1" :key="q.id" class="question-item" style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div style="flex: 1; min-width: 0; margin-right: 16px;">
+                <span class="question-type" style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;">{{ q.type }}</span>
+                <div class="question-title" style="font-weight: 600; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ q.title }}</div>
+              </div>
+              <div class="question-actions" style="display: flex; gap: 8px; flex-shrink: 0;">
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer;" type="button" @click="startQuestionPractice(q)">
+                  {{ hasPractice(q.id) ? '练笔记录' : '首次练笔' }}
+                </button>
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
+                  范文库
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Task 2 Column -->
+        <div class="library-column" style="border-left: 1px solid var(--border); padding-left: 24px;">
+          <h3 style="margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">Task 2 题库</h3>
+          <ul class="question-list" style="list-style: none; padding: 0;">
+            <li v-for="q in seedPrompts.task2" :key="q.id" class="question-item" style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div style="flex: 1; min-width: 0; margin-right: 16px;">
+                <span class="question-type" style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;">{{ q.topic || 'General' }}</span>
+                <div class="question-title" style="font-weight: 600; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ q.title }}</div>
+              </div>
+              <div class="question-actions" style="display: flex; gap: 8px; flex-shrink: 0;">
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer;" type="button" @click="startQuestionPractice(q)">
+                  {{ hasPractice(q.id) ? '练笔记录' : '首次练笔' }}
+                </button>
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
+                  范文库
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+
+      </div>
+    </div>
+
+
+
+    <!-- Add Question Mode -->
+    <div v-else-if="viewMode === 'add_question'" class="add-question-view card" style="padding: 32px; width: 100%; max-width: 1200px; margin: 20px auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h3 style="margin: 0;">录入新题</h3>
+        <button class="ghost-btn" type="button" @click="viewMode = 'library'">返回题库</button>
+      </div>
+      
+      <form @submit.prevent="saveNewQuestion" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <label style="font-weight: 600;">题目类型:</label>
+          <div style="display: flex; gap: 12px;">
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+              <input type="radio" v-model="newQuestion.taskType" value="task1"> Task 1
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+              <input type="radio" v-model="newQuestion.taskType" value="task2"> Task 2
+            </label>
           </div>
-          <button class="ghost-btn" type="button" @click="createNewPractice">新建</button>
         </div>
-        <ul class="practice-list">
-          <li
-            v-for="item in sortedPractices"
-            :key="item.id"
-            class="practice-item"
-            :class="{ active: current.id === item.id }"
-            @click="loadPractice(item.id)"
-          >
-            <div class="practice-title">{{ shortPrompt(item.prompt) }}</div>
-            <div class="practice-meta">{{ item.taskType.toUpperCase() }} · {{ item.status }}</div>
-          </li>
-          <li v-if="sortedPractices.length === 0" class="practice-empty">暂无练笔记录</li>
-        </ul>
-      </aside>
 
-      <main class="card writing-editor">
-        <div class="row three">
-          <select v-model="current.taskType" class="input">
-            <option value="task1">Task 1</option>
-            <option value="task2">Task 2</option>
-          </select>
-          <input v-model.number="current.durationMins" min="1" class="input" type="number" placeholder="时长（分钟）" />
-          <div class="timer-box">
-            <span>倒计时 {{ formatRemain(remainingSeconds) }}</span>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-weight: 600;">标题 (必填):</label>
+          <input type="text" v-model="newQuestion.title" placeholder="例如: Tourist Island 或 Government Spending" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;" required>
+        </div>
+
+        <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px; position: relative;">
+          <label style="font-weight: 600;">图表类型 (必填):</label>
+          <div style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 38px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; background: white;" @click="showTypeDropdown = !showTypeDropdown">
+            <span v-if="selectedChartTypes.length === 0" style="color: var(--text-secondary);">选择图表类型 (可多选)...</span>
+            <div v-for="type in selectedChartTypes" :key="type" style="background: var(--surface-hover); color: var(--text-main); padding: 2px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+              {{ type }}
+              <span style="cursor: pointer; font-weight: bold;" @click.stop="selectedChartTypes.splice(selectedChartTypes.indexOf(type), 1)">×</span>
+            </div>
+          </div>
+          
+          <div v-if="showTypeDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 4px;">
+            <label v-for="option in chartTypeOptions" :key="option" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 0;">
+              <input type="checkbox" :value="option" v-model="selectedChartTypes" style="cursor: pointer;" @click.stop>
+              <span>{{ option }}</span>
+            </label>
           </div>
         </div>
 
-        <div class="seed-row">
-          <button
-            v-for="(prompt, idx) in currentSeedPrompts"
-            :key="`${current.taskType}-${idx}`"
-            class="ghost-btn"
-            type="button"
-            @click="applySeedPrompt(prompt)"
-          >
-            示例题 {{ idx + 1 }}
-          </button>
+        <div v-if="newQuestion.taskType === 'task2'" style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-weight: 600;">话题分类 (选填):</label>
+          <input type="text" v-model="newQuestion.topic" placeholder="例如: Education, Environment, Technology" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;">
         </div>
 
-        <textarea v-model="current.prompt" class="input prompt" placeholder="输入写作题目..." @input="onEditorInput(false)" />
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-weight: 600;">题目内容 (Prompt) (必填):</label>
+          <textarea v-model="newQuestion.prompt" rows="6" placeholder="输入完整的题目要求..." style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; font-family: inherit;" required></textarea>
+        </div>
 
-        <div v-if="current.taskType === 'task1'" class="chart-wrap">
-          <label class="chart-label">图表上传</label>
-          <input type="file" accept="image/*" class="input" @change="onChartUpload" />
-          <div class="chart-preview" v-if="current.chartImage">
-            <img :src="current.chartImage" alt="chart" />
-            <button class="ghost-btn" type="button" @click="current.chartImage = ''">移除图表</button>
+        <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-weight: 600;">上传图片 (必填):</label>
+          <div style="border: 2px dashed var(--border); padding: 20px; border-radius: 6px; text-align: center; cursor: pointer;" @click="$refs.fileInput.click()">
+            <span style="color: var(--text-secondary);">点击选择图片 或 拖拽图片到这里</span>
+            <input type="file" ref="fileInput" style="display: none;" accept="image/*" @change="handleImageUpload">
+          </div>
+          <div v-if="newQuestion.chartImage" style="margin-top: 8px;">
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">已选择图片:</div>
+            <img :src="newQuestion.chartImage" style="max-height: 150px; border-radius: 4px; border: 1px solid var(--border);">
           </div>
         </div>
 
-        <div class="sections">
-          <div class="section-block" v-for="item in sectionSchema" :key="item.key">
-            <label class="section-label">{{ item.label }}</label>
-            <textarea
-              v-model="current.paragraphs[item.key]"
-              class="textarea section-textarea"
-              :placeholder="`请输入${item.label}内容...`"
-              @input="onEditorInput(true)"
-            />
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+          <button class="ghost-btn" type="button" @click="viewMode = 'library'">取消</button>
+          <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" type="submit">保存题目</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Practice Mode -->
+    <!-- Practice Mode -->
+    <div v-else-if="viewMode === 'practice'">
+      <!-- Task 1 Layout -->
+      <div v-if="current.taskType === 'task1'" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Left Column: Question -->
+        <aside class="card" style="padding: 20px; height: fit-content;">
+          <div style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px; width: fit-content; margin-bottom: 8px;">{{ activePrompt?.type }}</div>
+          <h3 style="margin: 0 0 12px 0; font-size: 1.5rem; color: var(--text-main);">{{ activePrompt?.title }}</h3>
+          <p style="white-space: pre-wrap; line-height: 1.6; color: var(--text-main);">{{ activePrompt?.prompt }}</p>
+          <img v-if="activePrompt?.image" :src="activePrompt.image" style="max-width: 100%; border-radius: 8px; margin-top: 16px; border: 1px solid var(--border);">
+        </aside>
+
+        <!-- Right Column: Records or Editor -->
+        <main class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <!-- If viewing records -->
+          <div v-if="!isEditingTask1" style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 1.25rem;">练笔记录</h3>
+              <button class="primary-btn" style="padding: 6px 12px; font-size: 14px;" @click="startNewDraftTask1">新建草稿</button>
+            </div>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              <li v-for="item in sortedPractices" :key="item.id" style="padding: 12px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;" @click="editPracticeTask1(item)">
+                <div>
+                  <div style="font-weight: 600; color: var(--text-main);">{{ new Date(item.updatedAt || item.createdAt).toLocaleString() }}</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">状态: {{ item.status }} | 词数: {{ item.wordCount || 0 }}</div>
+                </div>
+                <span style="color: var(--accent); font-weight: 600;">详情 →</span>
+              </li>
+              <li v-if="sortedPractices.length === 0" style="padding: 20px; text-align: center; color: var(--text-secondary);">暂无练笔记录</li>
+            </ul>
           </div>
-        </div>
 
-        <div class="status-row">
-          <span>词数: {{ current.wordCount }}</span>
-          <span>状态: {{ current.status }}</span>
-          <span>最后保存: {{ current.updatedAt ? new Date(current.updatedAt).toLocaleString() : '-' }}</span>
-          <span>反馈状态: {{ reviewStatusLabel }}</span>
-        </div>
+          <!-- If editing -->
+          <div v-else style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Top: Timer & Word Count -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
+              <button class="ghost-btn" style="padding: 4px 8px; font-size: 12px;" @click="isEditingTask1 = false">← 返回练习记录</button>
+              <div style="font-weight: bold; color: var(--accent); font-size: 1.1rem;">倒计时 {{ formatRemain(remainingSeconds) }}</div>
+              <div style="font-weight: bold; color: var(--text-main);">字数统计: {{ current.wordCount }}</div>
+            </div>
 
-        <div class="editor-actions">
-          <button class="ghost-btn" type="button" @click="startTimer" :disabled="timerRunning">开始计时</button>
-          <button class="ghost-btn" type="button" @click="pauseTimer" :disabled="!timerRunning">暂停</button>
-          <button class="ghost-btn" type="button" @click="saveDraft">保存草稿</button>
-          <button v-if="canOpenFeedback" class="ghost-btn" type="button" @click="openFeedback">{{ feedbackButtonLabel }}</button>
-          <button class="primary-btn" type="button" @click="submitPractice">结束并提交</button>
-        </div>
-      </main>
+            <!-- Middle: 4 paragraphs -->
+            <div class="sections" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="section-block" v-for="item in sectionSchema" :key="item.key" style="display: flex; flex-direction: column; gap: 6px;">
+                <label class="section-label" style="font-weight: 600; color: var(--text-main);">{{ item.label }}</label>
+                <textarea
+                  v-model="current.paragraphs[item.key]"
+                  class="textarea section-textarea"
+                  :placeholder="`请输入${item.label}内容...`"
+                  style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit;"
+                  @input="onEditorInput(true)"
+                />
+              </div>
+            </div>
+
+            <!-- Bottom: Status & Buttons -->
+            <div style="border-top: 1px solid var(--border-light); padding-top: 12px;">
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                <div>状态: {{ current.status }}</div>
+                <div>最后保存: {{ current.updatedAt ? new Date(current.updatedAt).toLocaleString() : new Date(current.createdAt).toLocaleString() }}</div>
+                <div>反馈状态: {{ reviewStatusLabel }}</div>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+                <button class="ghost-btn" style="padding: 8px 16px;" @click="saveDraft(true)">保存草稿</button>
+                <button class="ghost-btn" style="padding: 8px 16px; color: var(--error); border-color: var(--error);" @click="deleteDraft">删除草稿</button>
+                <button class="primary-btn" style="padding: 8px 16px;" @click="submitPractice">保存并提交</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- Task 2 Layout -->
+      <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Left Column: Question + Records -->
+        <aside style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Top: Question -->
+          <div class="card" style="padding: 20px; height: fit-content;">
+            <div style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px; width: fit-content; margin-bottom: 8px;">{{ activePrompt?.topic || 'General' }}</div>
+            <h3 style="margin: 0 0 12px 0; font-size: 1.5rem; color: var(--text-main);">{{ activePrompt?.title }}</h3>
+            <p style="white-space: pre-wrap; line-height: 1.6; color: var(--text-main);">{{ activePrompt?.prompt }}</p>
+          </div>
+          <!-- Bottom: Records -->
+          <div class="card" style="padding: 20px; flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0; font-size: 1.25rem;">练笔记录</h3>
+              <button class="primary-btn" style="padding: 6px 12px; font-size: 14px;" @click="createNewDraftForCurrent">新建草稿</button>
+            </div>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              <li v-for="item in sortedPractices" :key="item.id" style="padding: 12px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;" @click="loadPractice(item.id)">
+                <div>
+                  <div style="font-weight: 600; color: var(--text-main);">{{ new Date(item.updatedAt || item.createdAt).toLocaleString() }}</div>
+                  <div style="font-size: 12px; color: var(--text-secondary);">状态: {{ item.status }} | 词数: {{ item.wordCount || 0 }}</div>
+                </div>
+                <span style="color: var(--accent); font-weight: 600;">详情 →</span>
+              </li>
+              <li v-if="sortedPractices.length === 0" style="padding: 20px; text-align: center; color: var(--text-secondary);">暂无练笔记录</li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- Right Column: Editor -->
+        <main class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+          <!-- Top: Timer & Word Count -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
+            <div style="font-weight: bold; color: var(--accent); font-size: 1.1rem;">倒计时 {{ formatRemain(remainingSeconds) }}</div>
+            <div style="font-weight: bold; color: var(--text-main);">字数统计: {{ current.wordCount }}</div>
+          </div>
+
+          <!-- Middle: 4 paragraphs -->
+          <div class="sections" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="section-block" v-for="item in sectionSchema" :key="item.key" style="display: flex; flex-direction: column; gap: 6px;">
+              <label class="section-label" style="font-weight: 600; color: var(--text-main);">{{ item.label }}</label>
+              <textarea
+                v-model="current.paragraphs[item.key]"
+                class="textarea section-textarea"
+                :placeholder="`请输入${item.label}内容...`"
+                style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit;"
+                @input="onEditorInput(true)"
+              />
+            </div>
+          </div>
+
+          <!-- Bottom: Status & Buttons -->
+          <div style="border-top: 1px solid var(--border-light); padding-top: 12px;">
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+              <div>状态: {{ current.status }}</div>
+              <div>最后保存: {{ current.updatedAt ? new Date(current.updatedAt).toLocaleString() : new Date(current.createdAt).toLocaleString() }}</div>
+              <div>反馈状态: {{ reviewStatusLabel }}</div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+              <button class="ghost-btn" style="padding: 8px 16px;" @click="saveDraft(true)">保存草稿</button>
+              <button class="ghost-btn" style="padding: 8px 16px; color: var(--error); border-color: var(--error);" @click="deleteDraft">删除草稿</button>
+              <button class="primary-btn" style="padding: 8px 16px;" @click="submitPractice">保存并提交</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- 查看大图模态框 -->
+  <div v-if="showLargeImage" class="lightbox-modal" @click="showLargeImage = false">
+    <div class="lightbox-content" @click.stop>
+      <img :src="current.chartImage" alt="large chart" />
+      <button class="close-btn" @click="showLargeImage = false">&times;</button>
     </div>
   </div>
 </template>
@@ -120,22 +310,59 @@ import {
 } from '../utils/writingPractice.js'
 import { getFeedbackList } from '../utils/writingFeedback.js'
 import { buildWritingFeedbackRoute } from '../utils/writingProgress.js'
+import { task1Exemplars, task2Exemplars } from '../utils/writingExemplars.js'
+import { marked } from 'marked'
 
 const route = useRoute()
 const router = useRouter()
+
+function goBack() {
+  router.push('/exam/dashboard')
+}
 
 const practices = ref(getPractices())
 const feedbackList = ref(getFeedbackList())
 const current = ref(normalizePractice(createPractice()))
 const remainingSeconds = ref(current.value.remainingSeconds || current.value.durationMins * 60)
 const timerRunning = ref(false)
-const seedPrompts = getSeedPrompts()
+const seedPrompts = ref(getSeedPrompts())
+const viewMode = ref('library')
+
+const showExemplar = ref(false)
+const showLargeImage = ref(false)
+function toggleExemplar() {
+  showExemplar.value = !showExemplar.value
+}
+
+const currentExemplar = computed(() => {
+  if (!current.value.promptId) return null
+  return task1Exemplars.find(e => e.id === current.value.promptId) || 
+         task2Exemplars.find(e => e.id === current.value.promptId) || null
+})
+
+const aiExemplars = computed(() => {
+  if (!current.value.promptId) return []
+  const relatedPractices = practices.value.filter(p => p.promptId === current.value.promptId)
+  const practiceIds = relatedPractices.map(p => p.id)
+  const relatedFeedback = feedbackList.value.filter(f => practiceIds.includes(f.practiceId))
+  return relatedFeedback.map(f => f.sampleEssay).filter(Boolean)
+})
+
+
+const renderedNotes = computed(() => {
+  if (!currentExemplar.value) return ''
+  return marked.parse(currentExemplar.value.notes)
+})
 
 let intervalId = null
 let autosaveTimer = null
 
 const sortedPractices = computed(() => {
-  return [...practices.value].sort((a, b) => {
+  let list = [...practices.value]
+  if (viewMode.value === 'practice' && current.value.promptId) {
+    list = list.filter(p => p.promptId === current.value.promptId)
+  }
+  return list.sort((a, b) => {
     const ta = new Date(a.updatedAt || a.createdAt || 0).getTime()
     const tb = new Date(b.updatedAt || b.createdAt || 0).getTime()
     return tb - ta
@@ -143,7 +370,7 @@ const sortedPractices = computed(() => {
 })
 
 const sectionSchema = computed(() => getPracticeSchema(current.value.taskType))
-const currentSeedPrompts = computed(() => seedPrompts[current.value.taskType] || [])
+const currentSeedPrompts = computed(() => seedPrompts.value[current.value.taskType] || [])
 const currentFeedback = computed(() => feedbackList.value.find((item) => item.practiceId === current.value.id) || null)
 const canOpenFeedback = computed(() => current.value.status === 'submitted' || current.value.status === 'reviewed')
 const feedbackButtonLabel = computed(() => (current.value.status === 'reviewed' ? '查看反馈' : '去批改'))
@@ -205,9 +432,46 @@ function saveDraft(showAlert = true) {
   }
 }
 
-function createNewPractice() {
+function deleteDraft() {
+  if (!confirm('确定要删除当前草稿吗？此操作不可撤销。')) {
+    return
+  }
+  
+  const id = current.value.id
+  const promptId = current.value.promptId
+  const taskType = current.value.taskType
+  
+  if (id) {
+    practices.value = practices.value.filter(p => p.id !== id)
+    setPractices(practices.value)
+  }
+  
+  // 检查该题目下是否还有其他练笔记录
+  const remainingForPrompt = practices.value.filter(p => p.promptId === promptId)
+  
+  if (remainingForPrompt.length === 0) {
+    viewMode.value = 'library'
+    alert('草稿已删除，该题目的所有练笔记录已清空，已返回题库。')
+  } else {
+    if (taskType === 'task1') {
+      isEditingTask1.value = false // Task 1 返回记录列表
+    } else {
+      // Task 2 保持在编辑器，创建新草稿
+      createNewPractice('task2')
+      current.value.promptId = promptId
+      const activePromptObj = seedPrompts.value.task2.find(p => p.id === promptId)
+      if (activePromptObj) {
+        current.value.prompt = activePromptObj.prompt || activePromptObj.question
+        current.value.title = activePromptObj.title
+      }
+    }
+    alert('草稿已删除')
+  }
+}
+
+function createNewPractice(taskType = 'task2') {
   pauseTimer()
-  current.value = normalizePractice(createPractice())
+  current.value = normalizePractice(createPractice(taskType))
   remainingSeconds.value = current.value.durationMins * 60
 }
 
@@ -221,15 +485,207 @@ function loadPractice(id) {
   remainingSeconds.value = current.value.remainingSeconds || current.value.durationMins * 60
 }
 
-function applySeedPrompt(prompt) {
-  current.value.prompt = prompt
+function applySeedPrompt(item) {
+  if (typeof item === 'object') {
+    current.value.prompt = item.prompt || item.question
+    current.value.chartImage = item.image || ''
+    current.value.promptId = item.id || ''
+  } else {
+    current.value.prompt = item
+    current.value.promptId = ''
+  }
   onEditorInput(false)
+  showExemplar.value = false
 }
 
 function openFeedback() {
   if (!current.value.id || !canOpenFeedback.value) return
   router.push(buildWritingFeedbackRoute(current.value.id))
 }
+
+function hasPractice(promptId) {
+  return practices.value.some(p => p.promptId === promptId)
+}
+
+const isEditingTask1 = ref(false)
+
+const activePrompt = computed(() => {
+  if (!current.value.promptId) return null
+  return seedPrompts.value.task1.find(p => p.id === current.value.promptId) || 
+         seedPrompts.value.task2.find(p => p.id === current.value.promptId) || null
+})
+
+function startQuestionPractice(q) {
+  viewMode.value = 'practice'
+  current.value.promptId = q.id
+  current.value.taskType = q.id.startsWith('t2') ? 'task2' : 'task1'
+  
+  if (current.value.taskType === 'task1') {
+    isEditingTask1.value = false
+  } else {
+    isEditingTask1.value = true
+    const existingDraft = practices.value.find(p => p.promptId === q.id && p.status === 'draft')
+    if (existingDraft) {
+      loadPractice(existingDraft.id)
+    } else {
+      createNewPractice()
+      current.value.prompt = q.prompt || q.question
+      current.value.promptId = q.id
+      current.value.taskType = 'task2'
+      current.value.title = q.title
+      if (q.image) {
+        current.value.chartImage = q.image
+      }
+      saveDraft(false)
+    }
+  }
+}
+
+function startNewDraftTask1() {
+  const qId = current.value.promptId
+  const qObj = activePrompt.value
+  
+  isEditingTask1.value = true
+  createNewPractice('task1')
+  
+  current.value.promptId = qId
+  current.value.prompt = qObj?.prompt
+  current.value.taskType = 'task1'
+  current.value.title = qObj?.title
+  if (qObj?.image) {
+    current.value.chartImage = qObj.image
+  }
+  saveDraft(false)
+}
+
+function editPracticeTask1(item) {
+  isEditingTask1.value = true
+  loadPractice(item.id)
+}
+
+function viewQuestionExemplar(q) {
+  startQuestionPractice(q)
+  showExemplar.value = true
+}
+
+const newQuestion = ref({
+  taskType: 'task1',
+  title: '',
+  type: '',
+  topic: '',
+  prompt: '',
+  chartImage: ''
+})
+
+const chartTypeOptions = [
+  'Line Graph',
+  'Bar Graph',
+  'Pie Chart',
+  'Table',
+  'Diagram',
+  'Flowchart',
+  'Scatter Plot'
+]
+
+const selectedChartTypes = ref([])
+const showTypeDropdown = ref(false)
+
+watch(selectedChartTypes, (newVal) => {
+  newQuestion.value.type = newVal.join(' / ')
+})
+
+function addNewQuestion() {
+  viewMode.value = 'add_question'
+  newQuestion.value = {
+    taskType: 'task1',
+    title: '',
+    type: '',
+    topic: '',
+    prompt: '',
+    chartImage: ''
+  }
+  selectedChartTypes.value = []
+  showTypeDropdown.value = false
+}
+
+function handleImageUpload(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    newQuestion.value.chartImage = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function saveNewQuestion() {
+  // 验证必填项
+  if (!newQuestion.value.title.trim()) {
+    alert('请填写标题！')
+    return
+  }
+  if (!newQuestion.value.prompt.trim()) {
+    alert('请填写题目内容！')
+    return
+  }
+  
+  if (newQuestion.value.taskType === 'task1') {
+    if (selectedChartTypes.value.length === 0) {
+      alert('请选择至少一种图表类型！')
+      return
+    }
+    if (!newQuestion.value.chartImage) {
+      alert('请上传图表图片！')
+      return
+    }
+  }
+  
+  const q = {
+    id: `custom_${Date.now()}`,
+    title: newQuestion.value.title,
+    prompt: newQuestion.value.prompt,
+  }
+  
+  if (newQuestion.value.taskType === 'task1') {
+    q.type = newQuestion.value.type
+    q.image = newQuestion.value.chartImage
+    seedPrompts.value.task1.push(q)
+  } else {
+    q.topic = newQuestion.value.topic
+    seedPrompts.value.task2.push(q)
+  }
+  
+  const customQuestions = JSON.parse(localStorage.getItem('writing_custom_questions') || '{"task1":[], "task2":[]}')
+  customQuestions[newQuestion.value.taskType].push(q)
+  localStorage.setItem('writing_custom_questions', JSON.stringify(customQuestions))
+  
+  viewMode.value = 'library'
+}
+
+function createNewDraftForCurrent() {
+  if (!current.value.promptId) {
+    createNewPractice()
+    return
+  }
+  pauseTimer()
+  const qId = current.value.promptId
+  const qTitle = current.value.title
+  const qPrompt = current.value.prompt
+  const qType = current.value.taskType
+  const qImage = current.value.chartImage
+  
+  current.value = normalizePractice(createPractice(qType))
+  current.value.promptId = qId
+  current.value.title = qTitle
+  current.value.prompt = qPrompt
+  current.value.taskType = qType
+  current.value.chartImage = qImage
+  remainingSeconds.value = current.value.durationMins * 60
+  saveDraft(false)
+}
+
+
 
 function startTimer() {
   if (timerRunning.value) return
@@ -351,10 +807,20 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .writing-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg, #f7f6fa);
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+
 
 .writing-grid {
   display: grid;
@@ -541,5 +1007,59 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: 6px;
   }
+}
+.lightbox-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: pointer;
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 70%;
+  max-height: 70%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-content img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  background: white;
+  padding: 10px;
+}
+
+.close-btn {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 36px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 </style>

@@ -6,6 +6,7 @@ const defaultSettings = {
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: 'llama3',
   ollamaModelSample: 'llama3',
+  ollamaModelSpeaking: 'llama3',
   requestTimeoutMs: 600000, // 10 minutes
 };
 
