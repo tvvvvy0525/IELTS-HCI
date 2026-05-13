@@ -504,4 +504,80 @@
   - `src/views/exam/ListeningPracticeView.vue`
 
 ---
+
+## 会话：2026-05-11（Milestone 9：Speaking 落地与 AI 评分）
+
+### 阶段 1：白屏 Bug 修复
+- **状态：** complete
+- 执行的操作：
+  - 修复了 `vocabularyStore.js` 中变量初始化顺序导致的白屏错误。
+- 创建/修改的文件：
+  - `src/utils/vocabularyStore.js`
+
+### 阶段 2：ASR 服务优化与置信度提取
+- **状态：** complete
+- 执行的操作：
+  - 修复了 Python ASR 服务在处理 `en-US` 语言代码时的错误。
+  - 修复了临时音频文件找不到的路径错误。
+  - 开启了 `word_timestamps=True`，提取词级置信度并返回给前端。
+- 创建/修改的文件：
+  - `scripts/asr_server.py`
+  - `src/utils/speakingFeedback.js`
+  - `src/views/exam/SpeakingPracticeView.vue`
+
+### 阶段 3：口语反馈页面体验优化
+- **状态：** complete
+- 执行的操作：
+  - 将“查看分析”从手风琴模式改为多开模式，支持同时查看多维度的详细标准。
+  - 修正了流利度（WPM）和语法（句长）的阶梯评分标准，上限提升至 8.0。
+  - 修复了填充词比例显示为 `undefined%` 的 Bug。
+- 创建/修改的文件：
+  - `src/views/SpeakingFeedbackView.vue`
+  - `src/utils/speakingFeedback.js`
+
+### 阶段 4：接入口语 AI 综合评分
+- **状态：** complete
+- 执行的操作：
+  - 新建 `speakingAiClient.js`，复用 Ollama 配置，融入雅思口语官方四维标准。
+  - 在 `SpeakingFeedbackView.vue` 增加了“AI 深度评估”卡片。
+  - 在“设置”页面增加了“口语模型 (Speaking)”专属配置项，支持独立选择。
+- 创建/修改的文件：
+  - `src/utils/speakingAiClient.js`
+  - `src/views/SpeakingFeedbackView.vue`
+  - `src/views/SettingsView.vue`
+  - `src/utils/writingAiSettings.js`
+
+## 会话：2026-05-13（Writing 系统重构与体验优化）
+
+### 阶段 1：Writing 录入表单与交互优化
+- **状态：** complete
+- 执行的操作：
+  - 将“录入新题”卡片宽度调整为 1200px，解决过窄问题。
+  - 为录入表单添加必填项校验（Task 1 必填图表类型和图片，Task 2 话题分类选填）。
+  - 实现 Task 1 图表类型的多选下拉框（基于题库现有类型）。
+  - 修复按钮颜色过深问题，统一使用浅色背景。
+- 创建/修改的文件：
+  - `src/views/WritingSystemView.vue`
+  - `src/utils/writingPractice.js`
+
+### 阶段 2：Writing 练笔界面重构
+- **状态：** complete
+- 执行的操作：
+  - 重构 Task 1 练笔界面：左侧固定显示题目，右侧默认显示记录列表，点击后切换为编辑器。
+  - 重构 Task 2 练笔界面：左侧上方题目，下方记录列表；右侧固定为编辑器。
+  - 调整编辑器内部结构，计时器和字数统计移到最顶上，状态和按钮移到最下方。
+- 创建/修改的文件：
+  - `src/views/WritingSystemView.vue`
+
+### 阶段 3：细节打磨与 Bug 修复
+- **状态：** complete
+- 执行的操作：
+  - 修复 Task 1 新建草稿时默认获取 40 分钟的 Bug，正确限制为 20 分钟。
+  - 在 Task 1 写作界面增加“← 返回练习记录”按钮。
+  - 优化删除逻辑：若某题目的记录全被删除，自动退回到题库主界面。
+  - 修复 Task 1 点击“新建草稿”时左侧题目消失的 Reactivity Bug。
+- 创建/修改的文件：
+  - `src/views/WritingSystemView.vue`
+
+---
 *每个阶段完成后或遇到错误时更新此文件*
