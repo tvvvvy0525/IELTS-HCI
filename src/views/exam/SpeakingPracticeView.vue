@@ -60,7 +60,7 @@
       <div class="question-card card">
         <div class="question-meta">
           <span class="q-index">Q{{ currentQuestionIndex + 1 }} / {{ questions.length }}</span>
-          
+
           <!-- 朗读/看题切换按钮 -->
           <div class="question-controls" v-if="part !== 'Part2'">
             <button class="ghost-btn-small" type="button" @click="handleQuestionAction">
@@ -226,15 +226,15 @@ function speakText(text, callback) {
   if (!text) return
   // 先停止之前的朗读
   window.speechSynthesis.cancel()
-  
+
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'en-GB' // 雅思优先用英音
   utterance.rate = 0.9 // 语速略慢
-  
+
   if (callback) {
     utterance.onend = callback
   }
-  
+
   window.speechSynthesis.speak(utterance)
 }
 
@@ -318,7 +318,7 @@ async function startMediaRecorder() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     audioChunks = []
-    
+
     // 探测浏览器支持的音频格式
     const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
     let supportedType = ''
@@ -328,16 +328,16 @@ async function startMediaRecorder() {
         break
       }
     }
-    
+
     const options = supportedType ? { mimeType: supportedType } : {}
     mediaRecorder = new MediaRecorder(stream, options)
-    
+
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
         audioChunks.push(e.data)
       }
     }
-    
+
     // 启动录音，每 1000 毫秒触发一次 ondataavailable
     mediaRecorder.start(1000)
   } catch (e) {
@@ -373,7 +373,7 @@ async function startRecording() {
 async function stopRecording() {
   isProcessing.value = true
   isRecording.value = false
-  
+
   // 停止 Part 2 倒计时
   if (speakTimer) {
     clearInterval(speakTimer)
@@ -426,7 +426,7 @@ function reRecord() {
   if (speakTimer) {
     clearInterval(speakTimer)
   }
-  
+
   // 重置状态
   speakRemaining.value = 120 // SPEAK_TOTAL 在上面定义了
   currentTranscript.value = ''
@@ -434,10 +434,10 @@ function reRecord() {
   manualText.value = ''
   needsManualInput.value = false
   fallbackMessage.value = ''
-  
+
   // 重新开始计时
   if (part === 'Part2') startSpeakTimer()
-  
+
   // 重新开始录音
   setTimeout(() => {
     startRecording()
@@ -479,8 +479,8 @@ async function finishPractice() {
   // 计算平均置信度
   const segments = session.value.segments || []
   const validSegments = segments.filter(s => s.confidence !== null && s.confidence !== undefined)
-  const avgConfidence = validSegments.length > 0 
-    ? validSegments.reduce((sum, s) => sum + s.confidence, 0) / validSegments.length 
+  const avgConfidence = validSegments.length > 0
+    ? validSegments.reduce((sum, s) => sum + s.confidence, 0) / validSegments.length
     : null
 
   const feedback = calcRuleBasedFeedback({ transcript, durationSecs, part, confidence: avgConfidence })
@@ -518,7 +518,7 @@ async function finishPractice() {
 function startSpeaking() {
   clearInterval(prepTimer)
   phase.value = 'speaking'
-  
+
   if (part === 'Part2') {
     startSpeakTimer()
     // Part 2 不需要朗读，直接自动开始录音
