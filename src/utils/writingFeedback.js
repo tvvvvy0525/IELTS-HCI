@@ -2,7 +2,7 @@ const WRITING_FEEDBACK_KEY = 'writing_feedback_v1'
 const WRITING_PROMPT_TEMPLATE_KEY = 'writing_ai_prompt_template_v1'
 const WRITING_PROMPT_TEMPLATE_VERSION_KEY = 'writing_ai_prompt_template_version_v1'
 export const WRITING_FEEDBACK_UPDATED_EVENT = 'writing-feedback-updated'
-const CURRENT_PROMPT_TEMPLATE_VERSION = 'v4-original-restored'
+export const CURRENT_PROMPT_TEMPLATE_VERSION = 'v4-original-restored'
 
 const DEFAULT_PROMPT_TEMPLATE = `你是一位资深雅思写作考官。请对下面作文进行评分，并且**只返回一个合法的 JSON 对象**。不要输出 Markdown 代码块，不要输出解释，不要输出 JSON 以外的任何文字。
 

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  CURRENT_PROMPT_TEMPLATE_VERSION,
   createFeedback,
   getPromptTemplate,
   parseAiFeedbackDualMode,
@@ -64,5 +65,5 @@ test('getPromptTemplate resets outdated long cached templates to current default
   const template = getPromptTemplate()
 
   assert.match(template, /只返回一个合法的 JSON 对象/)
-  assert.equal(store.get('writing_ai_prompt_template_version_v1'), 'v2-short-json')
+  assert.equal(store.get('writing_ai_prompt_template_version_v1'), CURRENT_PROMPT_TEMPLATE_VERSION)
 })
