@@ -209,13 +209,15 @@ export function getSeedPrompts() {
       prompt: e.question,
       image: e.image,
       title: e.title,
-      type: e.type
+      type: e.type,
+      exemplar: e.sample
     })),
     task2: task2Exemplars.map(e => ({
       id: e.id,
       prompt: e.question,
       title: e.title,
-      topic: e.topic
+      topic: e.topic,
+      exemplar: e.sample
     }))
   }
   

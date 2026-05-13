@@ -75,7 +75,7 @@
         <h3 style="margin: 0;">录入新题</h3>
         <button class="ghost-btn" type="button" @click="viewMode = 'library'">返回题库</button>
       </div>
-      
+
       <form @submit.prevent="saveNewQuestion" style="display: flex; flex-direction: column; gap: 16px;">
         <div style="display: flex; gap: 16px; align-items: center;">
           <label style="font-weight: 600;">题目类型:</label>
@@ -103,7 +103,7 @@
               <span style="cursor: pointer; font-weight: bold;" @click.stop="selectedChartTypes.splice(selectedChartTypes.indexOf(type), 1)">×</span>
             </div>
           </div>
-          
+
           <div v-if="showTypeDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 4px;">
             <label v-for="option in chartTypeOptions" :key="option" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 0;">
               <input type="checkbox" :value="option" v-model="selectedChartTypes" style="cursor: pointer;" @click.stop>
@@ -141,7 +141,51 @@
       </form>
     </div>
 
-    <!-- Practice Mode -->
+    <!-- Exemplars View -->
+    <div v-else-if="viewMode === 'exemplars'" class="exemplars-view card" style="padding: 24px; width: 100%; max-width: 1200px; margin: 0 auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <div>
+          <span style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;">{{ currentQuestion?.type || currentQuestion?.topic }}</span>
+          <h2 style="margin: 4px 0 0 0; font-size: 1.5rem; color: var(--text-main);">{{ currentQuestion?.title }} - 范文库</h2>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Card 1: Official Exemplar -->
+        <div class="card" style="padding: 20px; background: var(--surface-hover); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; color: var(--accent);">官方范文</h3>
+            <span style="font-size: 12px; color: var(--text-muted);">标准参考</span>
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
+            <div v-if="currentQuestion?.exemplar" v-html="renderMarkdown(currentQuestion.exemplar)"></div>
+            <div v-else style="color: var(--text-muted); font-style: italic;">暂无官方范文</div>
+          </div>
+        </div>
+
+        <!-- Card 2: First Practice AI Exemplar -->
+        <div class="card" style="padding: 20px; background: var(--surface-hover); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; color: var(--accent);">第一次练笔 AI 范文</h3>
+            <div v-if="firstPractice" style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; color: var(--text-muted);">{{ formatDate(firstPractice.createdAt) }}</span>
+              <button class="ghost-btn" style="padding: 2px 8px; font-size: 12px;" @click="goToPractice(firstPractice.id)">对比查看</button>
+            </div>
+          </div>
+          <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
+            <div v-if="firstPractice?.sampleEssay" v-html="renderMarkdown(firstPractice.sampleEssay)"></div>
+            <div v-else-if="firstPractice" style="color: var(--text-muted); font-style: italic;">
+              该次练笔未生成范文。
+            </div>
+            <div v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--text-muted);">
+              <span>您还没有练习过这道题</span>
+              <button class="primary-btn" style="margin-top: 12px;" @click="startQuestionPractice(currentQuestion)">去写一篇</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Practice Mode -->
     <div v-else-if="viewMode === 'practice'">
       <!-- Task 1 Layout -->
@@ -191,8 +235,8 @@
                   v-model="current.paragraphs[item.key]"
                   class="textarea section-textarea"
                   :placeholder="`请输入${item.label}内容...`"
-                  style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit;"
-                  @input="onEditorInput(true)"
+                  style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit; overflow-y: hidden;"
+                  @input="e => { onEditorInput(true); adjustTextareaHeight(e); }"
                 />
               </div>
             </div>
@@ -259,8 +303,8 @@
                 v-model="current.paragraphs[item.key]"
                 class="textarea section-textarea"
                 :placeholder="`请输入${item.label}内容...`"
-                style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit;"
-                @input="onEditorInput(true)"
+                style="padding: 10px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 100px; font-family: inherit; overflow-y: hidden;"
+                @input="e => { onEditorInput(true); adjustTextareaHeight(e); }"
               />
             </div>
           </div>
@@ -288,6 +332,20 @@
     <div class="lightbox-content" @click.stop>
       <img :src="current.chartImage" alt="large chart" />
       <button class="close-btn" @click="showLargeImage = false">&times;</button>
+    </div>
+  </div>
+
+  <!-- 范文库弹窗 -->
+  <div v-if="showExemplarModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" @click="showExemplarModal = false">
+    <div style="background: var(--surface); width: 600px; max-height: 80vh; border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.24); display: flex; flex-direction: column; gap: 16px;" @click.stop>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
+        <h3 style="margin: 0; color: var(--accent);">{{ modalExemplarTitle }} - 官方范文</h3>
+        <button style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);" @click="showExemplarModal = false">&times;</button>
+      </div>
+      <div style="overflow-y: auto; flex: 1; font-size: 14px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;">{{ modalExemplar }}</div>
+      <div style="text-align: right; border-top: 1px solid var(--border-light); padding-top: 12px;">
+        <button class="primary-btn" @click="showExemplarModal = false">知道了</button>
+      </div>
     </div>
   </div>
 </template>
@@ -328,15 +386,49 @@ const timerRunning = ref(false)
 const seedPrompts = ref(getSeedPrompts())
 const viewMode = ref('library')
 
-const showExemplar = ref(false)
-const showLargeImage = ref(false)
+const showExemplarModal = ref(false) // 保留，以防万一
+const currentQuestion = ref(null)
+
+const firstPractice = computed(() => {
+  if (!currentQuestion.value) return null
+  const related = practices.value.filter(p => p.promptId === currentQuestion.value.id && p.status !== 'draft')
+  if (related.length === 0) return null
+  
+  const sorted = related.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+  const first = sorted[0]
+  
+  const fb = feedbackList.value.find(f => f.practiceId === first.id)
+  
+  return {
+    ...first,
+    sampleEssay: fb ? fb.sampleEssay : null
+  }
+})
+
+function goToPractice(id) {
+  router.push({
+    name: 'exam-writing-feedback',
+    query: { practiceId: id }
+  })
+}
+
+function renderMarkdown(text) {
+  if (!text) return ''
+  return marked.parse(text)
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 function toggleExemplar() {
   showExemplar.value = !showExemplar.value
 }
 
 const currentExemplar = computed(() => {
   if (!current.value.promptId) return null
-  return task1Exemplars.find(e => e.id === current.value.promptId) || 
+  return task1Exemplars.find(e => e.id === current.value.promptId) ||
          task2Exemplars.find(e => e.id === current.value.promptId) || null
 })
 
@@ -358,7 +450,8 @@ let intervalId = null
 let autosaveTimer = null
 
 const sortedPractices = computed(() => {
-  let list = [...practices.value]
+  // 过滤掉字数为 0 的草稿，除非它是当前正在编辑的草稿
+  let list = practices.value.filter(p => p.wordCount > 0 || p.id === current.value.id)
   if (viewMode.value === 'practice' && current.value.promptId) {
     list = list.filter(p => p.promptId === current.value.promptId)
   }
@@ -413,6 +506,12 @@ function onEditorInput(isContent = true) {
   scheduleAutoSave()
 }
 
+function adjustTextareaHeight(e) {
+  const el = e.target
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
 function syncCurrentPractice() {
   current.value.content = buildPracticeContent(current.value)
   current.value.wordCount = countWords(current.value.content)
@@ -436,19 +535,19 @@ function deleteDraft() {
   if (!confirm('确定要删除当前草稿吗？此操作不可撤销。')) {
     return
   }
-  
+
   const id = current.value.id
   const promptId = current.value.promptId
   const taskType = current.value.taskType
-  
+
   if (id) {
     practices.value = practices.value.filter(p => p.id !== id)
     setPractices(practices.value)
   }
-  
+
   // 检查该题目下是否还有其他练笔记录
   const remainingForPrompt = practices.value.filter(p => p.promptId === promptId)
-  
+
   if (remainingForPrompt.length === 0) {
     viewMode.value = 'library'
     alert('草稿已删除，该题目的所有练笔记录已清空，已返回题库。')
@@ -504,14 +603,14 @@ function openFeedback() {
 }
 
 function hasPractice(promptId) {
-  return practices.value.some(p => p.promptId === promptId)
+  return practices.value.some(p => p.promptId === promptId && p.wordCount > 0)
 }
 
 const isEditingTask1 = ref(false)
 
 const activePrompt = computed(() => {
   if (!current.value.promptId) return null
-  return seedPrompts.value.task1.find(p => p.id === current.value.promptId) || 
+  return seedPrompts.value.task1.find(p => p.id === current.value.promptId) ||
          seedPrompts.value.task2.find(p => p.id === current.value.promptId) || null
 })
 
@@ -519,7 +618,7 @@ function startQuestionPractice(q) {
   viewMode.value = 'practice'
   current.value.promptId = q.id
   current.value.taskType = q.id.startsWith('t2') ? 'task2' : 'task1'
-  
+
   if (current.value.taskType === 'task1') {
     isEditingTask1.value = false
   } else {
@@ -544,10 +643,10 @@ function startQuestionPractice(q) {
 function startNewDraftTask1() {
   const qId = current.value.promptId
   const qObj = activePrompt.value
-  
+
   isEditingTask1.value = true
   createNewPractice('task1')
-  
+
   current.value.promptId = qId
   current.value.prompt = qObj?.prompt
   current.value.taskType = 'task1'
@@ -564,8 +663,10 @@ function editPracticeTask1(item) {
 }
 
 function viewQuestionExemplar(q) {
-  startQuestionPractice(q)
-  showExemplar.value = true
+  practices.value = getPractices()
+  feedbackList.value = getFeedbackList()
+  currentQuestion.value = q
+  viewMode.value = 'exemplars'
 }
 
 const newQuestion = ref({
@@ -611,7 +712,7 @@ function addNewQuestion() {
 function handleImageUpload(event) {
   const file = event.target.files[0]
   if (!file) return
-  
+
   const reader = new FileReader()
   reader.onload = (e) => {
     newQuestion.value.chartImage = e.target.result
@@ -629,7 +730,7 @@ function saveNewQuestion() {
     alert('请填写题目内容！')
     return
   }
-  
+
   if (newQuestion.value.taskType === 'task1') {
     if (selectedChartTypes.value.length === 0) {
       alert('请选择至少一种图表类型！')
@@ -640,13 +741,13 @@ function saveNewQuestion() {
       return
     }
   }
-  
+
   const q = {
     id: `custom_${Date.now()}`,
     title: newQuestion.value.title,
     prompt: newQuestion.value.prompt,
   }
-  
+
   if (newQuestion.value.taskType === 'task1') {
     q.type = newQuestion.value.type
     q.image = newQuestion.value.chartImage
@@ -655,11 +756,11 @@ function saveNewQuestion() {
     q.topic = newQuestion.value.topic
     seedPrompts.value.task2.push(q)
   }
-  
+
   const customQuestions = JSON.parse(localStorage.getItem('writing_custom_questions') || '{"task1":[], "task2":[]}')
   customQuestions[newQuestion.value.taskType].push(q)
   localStorage.setItem('writing_custom_questions', JSON.stringify(customQuestions))
-  
+
   viewMode.value = 'library'
 }
 
@@ -674,7 +775,7 @@ function createNewDraftForCurrent() {
   const qPrompt = current.value.prompt
   const qType = current.value.taskType
   const qImage = current.value.chartImage
-  
+
   current.value = normalizePractice(createPractice(qType))
   current.value.promptId = qId
   current.value.title = qTitle
@@ -779,6 +880,15 @@ watch(
     }
   },
 )
+
+watch(() => current.value.paragraphs, () => {
+  setTimeout(() => {
+    document.querySelectorAll('.section-textarea').forEach(el => {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    });
+  }, 100);
+}, { deep: true, immediate: true })
 
 if (route.query.practiceId) {
   const id = String(route.query.practiceId)
