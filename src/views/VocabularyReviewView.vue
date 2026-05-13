@@ -102,6 +102,17 @@
         <RouterLink to="/exam/vocabulary/library" class="secondary-btn">浏览词库</RouterLink>
       </div>
     </div>
+
+    <div v-if="showGoalCompleteModal" class="goal-modal-backdrop">
+      <div class="goal-modal card">
+        <h3>🎉 今日任务已完成！</h3>
+        <p class="text-secondary">你已经达成今日词汇目标，做得很棒！是否继续复习，还是进入下一项任务？</p>
+        <div class="goal-modal-actions">
+          <button class="secondary-btn" type="button" @click="continueReview">继续复习 💪</button>
+          <button class="primary-btn" type="button" @click="goNextTask">进行下一项任务 🚀</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -109,6 +120,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { vocabularyStore } from '../utils/vocabularyStore.js';
+import { getExamHistory } from '../utils/examHistory.js';
+import { getTodayStudyRoute } from '../utils/studyFlow.js';
 
 const router = useRouter();
 
@@ -144,6 +157,7 @@ const progressPercentage = computed(() => {
 const isGoalMet = computed(() => {
   return state.dailyProgress.knownCount >= state.dailyGoal;
 });
+const showGoalCompleteModal = ref(false);
 
 // 初始化加载队列
 function initQueue() {
@@ -179,9 +193,15 @@ function flipCard() {
 // 处理用户选择
 function handleChoice(choice) {
   if (!currentWord.value) return;
+  const prevKnownCount = Number(state.dailyProgress.knownCount || 0);
   
   // 更新状态
   vocabularyStore.updateWordStatus(currentWord.value.id, choice);
+  const nextKnownCount = Number(state.dailyProgress.knownCount || 0);
+  const justReachedGoal = prevKnownCount < state.dailyGoal && nextKnownCount >= state.dailyGoal;
+  if (justReachedGoal) {
+    showGoalCompleteModal.value = true;
+  }
   
   // 动画和切换到下一个
   isFlipped.value = false;
@@ -200,6 +220,19 @@ function handleChoice(choice) {
       }
     }
   }, 200);
+}
+
+function continueReview() {
+  showGoalCompleteModal.value = false;
+}
+
+function goNextTask() {
+  const nextRoute = getTodayStudyRoute({
+    records: getExamHistory(),
+    vocabState: state,
+  });
+  showGoalCompleteModal.value = false;
+  router.push(nextRoute.path);
 }
 </script>
 
@@ -541,5 +574,42 @@ function handleChoice(choice) {
   font-weight: 760;
   cursor: pointer;
   color: var(--text);
+}
+
+.goal-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2300;
+}
+
+.goal-modal {
+  width: min(520px, 92vw);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goal-modal h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.goal-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.goal-modal-actions .primary-btn {
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
 }
 </style>

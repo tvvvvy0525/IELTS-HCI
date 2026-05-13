@@ -12,7 +12,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
-        {{ stats.latestDraft ? '继续未完成练习' : (stats.recentRecords.length ? '打开最近练习' : '开始练习') }}
+        {{ stats.latestDraft ? '继续未完成练习' : '开始今日任务' }}
       </button>
     </section>
 
@@ -129,6 +129,7 @@
       </button>
     </section>
   </div>
+  <OnboardingWizard v-if="showOnboarding" @done="handleOnboardingDone" />
 </template>
 
 <script setup>
@@ -136,17 +137,20 @@ import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import SubjectProgress from '../components/SubjectProgress.vue'
 import WritingTrendChart from '../components/WritingTrendChart.vue'
-import { resolveRouteFromRecord } from '../utils/examNavigation.js'
+import OnboardingWizard from '../components/OnboardingWizard.vue'
 import { WRITING_FEEDBACK_UPDATED_EVENT, getFeedbackList } from '../utils/writingFeedback.js'
 import { WRITING_PRACTICES_UPDATED_EVENT, getPractices } from '../utils/writingPractice.js'
-import { buildWritingHistoryAction, getWritingDashboardStats, getWritingTrendData } from '../utils/writingProgress.js'
+import { getWritingDashboardStats, getWritingTrendData } from '../utils/writingProgress.js'
 import { vocabularyStore } from '../utils/vocabularyStore.js'
+import { getOnboardingState } from '../utils/onboardingState.js'
+import { getTodayStudyRoute } from '../utils/studyFlow.js'
 import {
   EXAM_DRAFTS_UPDATED_EVENT,
   getLatestDraftSession,
 } from '../utils/examDrafts.js'
 import {
   EXAM_HISTORY_UPDATED_EVENT,
+  getExamHistory,
   getExamStats,
   getSubjectStats,
 } from '../utils/examHistory.js'
@@ -178,6 +182,7 @@ const stats = reactive({
   streak: 0,
   recentRecords: [],
   latestDraft: null,
+  fullHistory: [],
 })
 
 const readingStats = reactive({
@@ -216,6 +221,9 @@ const trendData = reactive({
   data: [],
 })
 
+const onboardingState = reactive(getOnboardingState())
+const showOnboarding = computed(() => !onboardingState.completed)
+
 const recentSummary = computed(() => {
   if (stats.latestDraft) {
     return `有未完成练习：${stats.latestDraft.title}，可继续上次进度。`
@@ -223,7 +231,7 @@ const recentSummary = computed(() => {
 
   const recentRecord = stats.recentRecords[0]
   if (!recentRecord) {
-    return '当前还没有练习记录，先从一套阅读题开始。'
+    return '欢迎开始你的第一次练习！点击右侧“开始今日任务”，我会带你按顺序完成并记录进度。'
   }
 
   if (recentRecord.subject === 'writing') {
@@ -245,6 +253,7 @@ function refreshDashboard() {
   trendData.data = newTrendData.data
 
   stats.latestDraft = getLatestDraftSession()
+  stats.fullHistory = getExamHistory()
 }
 
 async function startPractice() {
@@ -253,21 +262,22 @@ async function startPractice() {
     return
   }
 
-  const recentRecord = stats.recentRecords[0]
-  if (recentRecord) {
-    if (recentRecord.subject === 'writing') {
-      router.push(buildWritingHistoryAction(recentRecord, getFeedbackList()).route)
-      return
-    }
-    router.push(await resolveRouteFromRecord(recentRecord))
-    return
-  }
-
-  router.push('/exam/reading')
+  const nextRoute = getTodayStudyRoute({
+    records: stats.fullHistory,
+    vocabState,
+  })
+  router.push(nextRoute.path)
 }
 
 function openVocabulary() {
   router.push('/exam/vocabulary')
+}
+
+function handleOnboardingDone(payload) {
+  Object.assign(onboardingState, getOnboardingState())
+  if (payload?.startPath) {
+    router.push(payload.startPath)
+  }
 }
 
 onMounted(() => {
