@@ -235,6 +235,29 @@
 |--------|------|---------|---------|
 | 2026-05-08 | 无 | 1 | 当前为规划阶段 |
 
+## 会话：2026-05-13（Milestone 10 规划：小白可用闭环改造）
+
+### 阶段 1：闭环可用性审查
+- **状态：** complete
+- 执行的操作：
+  - 审查 `router`、`Dashboard`、`History`、`Settings`、`Tools`、`Writing`、`Speaking` 主流程
+  - 识别“功能闭环已具备，但小白上手门槛仍高”的关键阻塞点
+  - 输出 P0/P1 优先级清单
+- 创建/修改的文件：
+  - `plan/task_plan.md`
+  - `plan/progress.md`
+
+### 阶段 2：新里程碑落地
+- **状态：** complete
+- 执行的操作：
+  - 新增 `Milestone 10` 文档并拆解到文件级任务
+  - 明确 In/Out Scope、DoD、风险缓解、测试口径
+  - 同步 `task_plan.md` 当前阶段与待办
+- 创建/修改的文件：
+  - `plan/Milestone10-小白可用闭环改造任务拆解.md`
+  - `plan/task_plan.md`
+  - `plan/progress.md`
+
 ## 会话：2026-05-09（Milestone 5 规划）
 
 ### 阶段 1：词汇系统需求收敛
