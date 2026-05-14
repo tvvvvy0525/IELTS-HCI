@@ -54,7 +54,7 @@
           <span class="subject-mark">✓</span>
           <h3>听力</h3>
         </div>
-        <p>雅思听力一共分为 4 个部分，40 道题。常见理解方式是：30 分钟用于听录音并作答，最后 10 分钟用于誊写答案。正式考试时，录音只播放一遍，所以稳定做题节奏比慌着写答案更重要。</p>
+        <p>雅思听力一共分为 4 个部分，40 道题。机考时，你会边听边直接在电脑上作答；和纸笔考试“30 分钟用于听录音并作答，最后 10 分钟用于誊写答案”的流程不同，机考结束后通常只有 2 分钟检查答案。正式考试时，录音只播放一遍，所以稳定做题节奏很重要。</p>
         <p>常见题型包括选择题、填空题、完成表格题、配对题、地图图表题。不同 section 的场景会从日常对话逐步过渡到学术对话和学术独白。</p>
 
         <div class="intro-table-wrap">
@@ -366,6 +366,19 @@ function goSubject(path) {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.intro-hero > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.intro-hero .intro-actions {
+  flex-shrink: 0;
+}
+
+.intro-hero .primary-btn {
+  white-space: nowrap;
 }
 
 @media (max-width: 860px) {

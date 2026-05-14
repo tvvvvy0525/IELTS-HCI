@@ -8,7 +8,7 @@
 
     <div class="shell" @mousedown="onShellMouseDown" @dragstart="onDragStart" @dragend="onDragEnd" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop" @input="updateAnsweredStatus" @change="updateAnsweredStatus">
       <section class="pane" id="left" @mouseup="onMouseUp" @click="onPaneClick">
-        <div class="passage-content" v-for="block in examData?.passage?.blocks" :key="block.blockId" v-html="block.html"></div>
+        <div class="passage-content" v-for="block in examData?.passage?.blocks" :key="block.blockId" v-html="block.html || block.bodyHtml"></div>
       </section>
 
       <div id="divider"></div>
@@ -18,87 +18,99 @@
       </section>
     </div>
 
-    <!-- Footer Navigation & Grading -->
-    <footer class="footer" v-if="loaded">
-      <div class="footer-controls">
-        <button class="footer-btn" @click="resetExam">Reset</button>
-        <button class="footer-btn primary" @click="submitExam">Submit</button>
-      </div>
-      <div class="question-nav">
-        <span class="nav-label">题目导航</span>
-        <button
-          class="nav-btn"
-          v-for="qId in examData?.questionOrder || []"
-          :key="qId"
-          :class="{
-            'answered': !isSubmitted && answeredMap[qId],
-            'correct': isSubmitted && (gradingResult[qId] === true || readingOverrides[qId]),
-            'incorrect': isSubmitted && gradingResult[qId] === false && !readingOverrides[qId]
-          }"
-          @click="scrollToQuestion(qId)"
-        >
-          {{ examData?.questionDisplayMap?.[qId] || qId.replace('q', '') }}
-        </button>
-      </div>
-    </footer>
+    <div
+      v-if="canResizeResults"
+      class="horizontal-resizer"
+      title="拖动调整结果区高度"
+      @mousedown="onResultResizerMouseDown"
+    ></div>
 
-    <section v-if="isSubmitted" class="explanation-panel">
-      <div class="explanation-card">
-        <div class="explanation-header">
-          <div>
-            <h3>题目解析</h3>
-            <p>提交后可按题号查看对应答案解释。</p>
-          </div>
+    <div class="bottom-panel" :class="{ submitted: isSubmitted, expanded: canResizeResults }" :style="bottomPanelStyle">
+      <!-- Footer Navigation & Grading -->
+      <footer class="footer" v-if="loaded">
+        <div class="footer-controls">
+          <button class="footer-btn" @click="resetExam">Reset</button>
+          <button class="footer-btn primary" @click="submitExam">Submit</button>
+          <button v-if="isSubmitted" class="footer-btn" type="button" @click="toggleExplanationPanel">
+            {{ explanationPanelExpanded ? '收起结果' : '展开结果' }}
+          </button>
         </div>
+        <div class="question-nav">
+          <span class="nav-label">题目导航</span>
+          <button
+            class="nav-btn"
+            v-for="qId in examData?.questionOrder || []"
+            :key="qId"
+            :class="{
+              'answered': !isSubmitted && answeredMap[qId],
+              'correct': isSubmitted && (gradingResult[qId] === true || readingOverrides[qId]),
+              'incorrect': isSubmitted && gradingResult[qId] === false && !readingOverrides[qId]
+            }"
+            @click="scrollToQuestion(qId)"
+          >
+            {{ examData?.questionDisplayMap?.[qId] || qId.replace('q', '') }}
+          </button>
+        </div>
+      </footer>
 
-        <div v-if="examData?.questionOrder?.length" class="explanation-body">
-          <div class="explanation-tabs">
-            <button
-              v-for="qId in examData?.questionOrder"
-              :key="qId"
-              class="explanation-tab"
-              :class="{ 
-                active: activeExplanationQuestionId === qId,
-                'tab-correct': gradingResult[qId] === true,
-                'tab-incorrect': gradingResult[qId] === false
-              }"
-              type="button"
-              @click="activeExplanationQuestionId = qId"
-            >
-              第 {{ examData?.questionDisplayMap?.[qId] || qId.replace('q', '') }} 题
-            </button>
+      <section v-if="isSubmitted && explanationPanelExpanded" class="explanation-panel">
+        <div class="explanation-card">
+          <div class="explanation-header">
+            <div>
+              <h3>题目解析</h3>
+              <p>提交后可按题号查看对应答案解释。</p>
+            </div>
           </div>
 
-          <div class="explanation-detail" style="margin-top: 12px;">
-            <div v-if="activeExplanationQuestionId && gradingResult[activeExplanationQuestionId] === false" class="override-controls" style="margin-bottom: 12px;">
-              <button 
-                class="footer-btn" 
-                @click="toggleOverride(activeExplanationQuestionId)"
-                style="font-size: 0.9em; padding: 6px 12px;"
+          <div v-if="examData?.questionOrder?.length" class="explanation-body">
+            <div class="explanation-tabs">
+              <button
+                v-for="qId in examData?.questionOrder"
+                :key="qId"
+                class="explanation-tab"
+                :class="{ 
+                  active: activeExplanationQuestionId === qId,
+                  'tab-correct': gradingResult[qId] === true,
+                  'tab-incorrect': gradingResult[qId] === false
+                }"
+                type="button"
+                @click="activeExplanationQuestionId = qId"
               >
-                {{ readingOverrides[activeExplanationQuestionId] ? '取消平反' : '平反此题 (标记为正确)' }}
+                第 {{ examData?.questionDisplayMap?.[qId] || qId.replace('q', '') }} 题
               </button>
             </div>
-            <div v-if="activeExplanation" class="explanation-text">
-              <pre>{{ activeExplanation.text }}</pre>
+
+            <div class="explanation-detail" style="margin-top: 12px;">
+              <div v-if="activeExplanationQuestionId && gradingResult[activeExplanationQuestionId] === false" class="override-controls" style="margin-bottom: 12px;">
+                <button 
+                  class="footer-btn" 
+                  @click="toggleOverride(activeExplanationQuestionId)"
+                  style="font-size: 0.9em; padding: 6px 12px;"
+                >
+                  {{ readingOverrides[activeExplanationQuestionId] ? '取消平反' : '平反此题 (标记为正确)' }}
+                </button>
+              </div>
+              <div v-if="activeExplanation" class="explanation-text">
+                <pre>{{ activeExplanation.text }}</pre>
+              </div>
+              <div v-else class="explanation-empty">
+                当前题目暂未接入解析数据。
+              </div>
             </div>
-            <div v-else class="explanation-empty">
-              当前题目暂未接入解析数据。
-            </div>
+          </div>
+
+          <div v-else class="explanation-empty">
+            本次全部答对，暂无错题解析。
           </div>
         </div>
 
-        <div v-else class="explanation-empty">
-          本次全部答对，暂无错题解析。
-        </div>
-      </div>
-
-      <NextActionPanel
-        title="继续下一步"
-        description="可以马上再做一套阅读，去历史里回看本次结果，或切到今天的下一科。"
-        :actions="nextActions"
-      />
-    </section>
+        <NextActionPanel
+          title="继续下一步"
+          description="可以马上再做一套阅读，去历史里回看本次结果，或切到今天的下一科。"
+          :actions="nextActions"
+        />
+      </section>
+    </div>
 
     <!-- Selection Bar -->
     <div class="selbar" v-show="selbarVisible" :style="selbarStyle" @mousedown.prevent>
@@ -145,22 +157,19 @@ import {
 } from '../../utils/readingDraftState.js'
 import { isReadingAnswerCorrect } from '../../utils/readingAnswer.js'
 import { findReadingExplanation } from '../../utils/readingExplanations.js'
+import { isMockMode, getNextMockRoute } from '../../utils/mockTestFlow.js'
 
 const route = useRoute()
 const router = useRouter()
-const examId = route.params.id
-
-watch(() => route.fullPath, () => {
-  if (route.query.reset === 'true') {
-    clearReadingAnnotationState(examId)
-    clearReadingDraftState(examId)
-    clearDraftSession('reading', examId)
-    
-    router.replace(route.path).then(() => {
-      window.location.reload();
-    })
-  }
-}, { immediate: true })
+const examId = computed(() => String(route.params.id || ''))
+const mockMapping = {
+  'reading-p1-70': 'p1-low-70',
+  'reading-p3-180': 'p3-high-180',
+  'reading-p2-141': 'p2-high-141',
+  'reading-p1-171': 'p1-high-171',
+}
+const DEFAULT_RESULT_PANEL_HEIGHT = 420
+const MIN_RESULT_PANEL_HEIGHT = 240
 const examData = ref(null)
 const loaded = ref(false)
 const isDark = ref(false)
@@ -183,10 +192,20 @@ const readingOverrides = ref({})
 const submissionTimestamp = ref(null)
 const explanationData = ref(null)
 const activeExplanationQuestionId = ref(null)
+const explanationPanelExpanded = ref(false)
+const resultPanelHeight = ref(DEFAULT_RESULT_PANEL_HEIGHT)
+const canResizeResults = computed(() => isSubmitted.value && explanationPanelExpanded.value)
+const bottomPanelStyle = computed(() => (
+  canResizeResults.value ? { height: `${resultPanelHeight.value}px` } : {}
+))
 
 // Timer State
 const elapsedSeconds = ref(0)
 let timerInterval = null
+let resultResizerActive = false
+let resultResizerStartY = 0
+let resultResizerStartHeight = DEFAULT_RESULT_PANEL_HEIGHT
+let loadRequestToken = 0
 
 const formattedTime = computed(() => {
   const m = Math.floor(elapsedSeconds.value / 60)
@@ -207,7 +226,7 @@ const nextActions = computed(() => ([
   {
     label: '再练一套',
     variant: 'primary',
-    to: { path: `/exam/reading/${examId}`, query: { reset: 'true' } },
+    to: { path: `/exam/reading/${examId.value}`, query: { reset: 'true' } },
   },
   {
     label: '查看记录',
@@ -217,9 +236,26 @@ const nextActions = computed(() => ([
   {
     label: '进入下一科',
     variant: 'ghost',
-    to: '/exam/listening',
+    to: isMockMode() ? getNextMockRoute() : '/exam/listening',
   },
 ]))
+
+function getReadingExamCache() {
+  if (typeof window === 'undefined') return {}
+  window.__READING_EXAM_CACHE__ ||= {}
+  return window.__READING_EXAM_CACHE__
+}
+
+function getReadingExplanationCache() {
+  if (typeof window === 'undefined') return {}
+  window.__READING_EXPLANATION_CACHE__ ||= {}
+  return window.__READING_EXPLANATION_CACHE__
+}
+
+function clampResultPanelHeight(height) {
+  const maxHeight = Math.max(MIN_RESULT_PANEL_HEIGHT, window.innerHeight - 180)
+  return Math.min(Math.max(height, MIN_RESULT_PANEL_HEIGHT), maxHeight)
+}
 
 const explanationModules = import.meta.glob('../../../generated/reading-explanations/*.js')
 
@@ -238,6 +274,87 @@ async function loadReadingExplanationScript(id) {
   }
 }
 
+function resetReadingViewState() {
+  loaded.value = false
+  examData.value = null
+  explanationData.value = null
+  answeredMap.value = {}
+  gradingResult.value = {}
+  isSubmitted.value = false
+  readingOverrides.value = {}
+  submissionTimestamp.value = null
+  activeExplanationQuestionId.value = null
+  explanationPanelExpanded.value = false
+  elapsedSeconds.value = 0
+  notesStore.value = {}
+  selbarVisible.value = false
+  notesVisible.value = false
+  currentNoteId.value = null
+  noteContent.value = ''
+  activeRange.value = null
+  activeHlNode.value = null
+  resultPanelHeight.value = DEFAULT_RESULT_PANEL_HEIGHT
+}
+
+function registerReadingDataTargets(targetExamId, resolvedExamId, requestToken) {
+  window.__READING_EXAM_DATA__ = {
+    register: (id, payload) => {
+      getReadingExamCache()[id] = payload
+      if (requestToken === loadRequestToken && (id === targetExamId || id === resolvedExamId)) {
+        examData.value = payload
+      }
+    },
+  }
+
+  window.__READING_EXPLANATION_DATA__ = {
+    register: (id, payload) => {
+      getReadingExplanationCache()[id] = payload
+      if (requestToken === loadRequestToken && (id === targetExamId || id === resolvedExamId)) {
+        explanationData.value = payload
+      }
+    },
+  }
+}
+
+async function loadExamData(targetExamId) {
+  if (!targetExamId) return
+
+  const requestToken = ++loadRequestToken
+  const resolvedExamId = mockMapping[targetExamId] || targetExamId
+  const examCache = getReadingExamCache()
+  const explanationCache = getReadingExplanationCache()
+
+  stopTimer()
+  resetReadingViewState()
+  registerReadingDataTargets(targetExamId, resolvedExamId, requestToken)
+
+  try {
+    examData.value = examCache[resolvedExamId] || examCache[targetExamId] || null
+    explanationData.value = explanationCache[resolvedExamId] || explanationCache[targetExamId] || null
+
+    if (!examData.value) {
+      await import(`../../../generated/reading-exams/${resolvedExamId}.js`)
+    }
+
+    if (!explanationData.value) {
+      await loadReadingExplanationScript(resolvedExamId)
+    }
+
+    if (requestToken !== loadRequestToken) return
+    if (!examData.value) throw new Error(`reading exam payload missing: ${targetExamId}`)
+
+    loaded.value = true
+    await nextTick()
+    restoreReadingAnnotations(targetExamId)
+    updateAnsweredStatus()
+    startTimer()
+  } catch (e) {
+    if (requestToken !== loadRequestToken) return
+    console.error('Failed to load exam data', e)
+    alert(`无法加载题目：${targetExamId}`)
+  }
+}
+
 const startTimer = () => {
   if (timerInterval) return
   timerInterval = setInterval(() => {
@@ -253,10 +370,6 @@ const stopTimer = () => {
     timerInterval = null
   }
 }
-
-onUnmounted(() => {
-  stopTimer()
-})
 
 const updateAnsweredStatus = () => {
   if (!examData.value) return;
@@ -302,49 +415,36 @@ const updateAnsweredStatus = () => {
   persistReadingDraft();
 }
 
-onMounted(async () => {
-  if (route.query.reset === 'true') {
-    clearDraftSession('reading', examId)
-    clearReadingAnnotationState(examId)
-  }
+watch(
+  () => [examId.value, route.query.reset],
+  async ([targetExamId, resetFlag]) => {
+    if (!targetExamId) return
 
-  const mockMapping = {
-    'reading-p1-70': 'p1-low-70',
-    'reading-p3-180': 'p3-high-180',
-    'reading-p2-141': 'p2-high-141',
-    'reading-p1-171': 'p1-high-171',
-  };
-  const resolvedExamId = mockMapping[examId] || examId;
-
-  // Mock the registry pattern from legacy code
-  window.__READING_EXAM_DATA__ = {
-    register: (id, payload) => {
-      if (id === examId || id === resolvedExamId) {
-        examData.value = payload
-      }
+    if (resetFlag === 'true') {
+      clearReadingAnnotationState(targetExamId)
+      clearReadingDraftState(targetExamId)
+      clearDraftSession('reading', targetExamId)
     }
-  }
-  window.__READING_EXPLANATION_DATA__ = {
-    register: (id, payload) => {
-      if (id === examId || id === resolvedExamId) {
-        explanationData.value = payload
-      }
-    },
-  }
 
-  try {
-    // Dynamic import matching legacy structure
-    await import(`../../../generated/reading-exams/${resolvedExamId}.js`)
-    await loadReadingExplanationScript(resolvedExamId)
-    loaded.value = true
-    await nextTick()
-    restoreReadingAnnotations()
-    updateAnsweredStatus()
-    startTimer()
-  } catch (e) {
-    console.error("Failed to load exam data", e)
-    alert("无法加载题目：" + examId)
-  }
+    await loadExamData(targetExamId)
+
+    if (resetFlag === 'true' && route.query.reset === 'true') {
+      router.replace(route.path)
+    }
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  window.addEventListener('mousemove', onResultResizerMouseMove)
+  window.addEventListener('mouseup', onResultResizerMouseUp)
+})
+
+onUnmounted(() => {
+  stopTimer()
+  window.removeEventListener('mousemove', onResultResizerMouseMove)
+  window.removeEventListener('mouseup', onResultResizerMouseUp)
+  document.body.style.userSelect = ''
 })
 
 function getPaneState() {
@@ -381,31 +481,33 @@ function getReadingDraftSnapshot() {
     answeredMap: { ...answeredMap.value },
     readingOverrides: { ...readingOverrides.value },
     submissionTimestamp: submissionTimestamp.value,
+    explanationPanelExpanded: explanationPanelExpanded.value,
+    resultPanelHeight: resultPanelHeight.value,
   }
 }
 
-function persistReadingDraft() {
-  saveReadingDraftState(examId, getReadingDraftSnapshot())
+function persistReadingDraft(targetExamId = examId.value) {
+  saveReadingDraftState(targetExamId, getReadingDraftSnapshot())
   saveDraftSession({
     subject: 'reading',
-    examId,
+    examId: targetExamId,
     title: examData.value?.meta?.title || '未命名阅读草稿',
     updatedAt: new Date().toISOString(),
     routeTarget: {
-      path: `/exam/reading/${examId}`,
+      path: `/exam/reading/${targetExamId}`,
     },
-    draftKey: `reading_draft:${examId}`,
+    draftKey: `reading_draft:${targetExamId}`,
   })
 }
 
-function persistReadingAnnotations() {
-  saveReadingAnnotationState(examId, getPaneState())
-  persistReadingDraft()
+function persistReadingAnnotations(targetExamId = examId.value) {
+  saveReadingAnnotationState(targetExamId, getPaneState())
+  persistReadingDraft(targetExamId)
 }
 
-function restoreReadingAnnotations() {
-  const savedDraft = getReadingDraftState(examId)
-  const savedState = getReadingAnnotationState(examId)
+function restoreReadingAnnotations(targetExamId = examId.value) {
+  const savedDraft = getReadingDraftState(targetExamId)
+  const savedState = getReadingAnnotationState(targetExamId)
   const leftPane = document.getElementById('left')
   const rightPane = document.getElementById('right')
 
@@ -435,6 +537,8 @@ function restoreReadingAnnotations() {
   answeredMap.value = { ...savedDraft.answeredMap }
   readingOverrides.value = savedDraft.readingOverrides || {}
   submissionTimestamp.value = savedDraft.submissionTimestamp || null
+  explanationPanelExpanded.value = savedDraft.explanationPanelExpanded ?? false
+  resultPanelHeight.value = clampResultPanelHeight(savedDraft.resultPanelHeight || DEFAULT_RESULT_PANEL_HEIGHT)
   
   if (isSubmitted.value) {
     if (!activeExplanationQuestionId.value) {
@@ -459,6 +563,35 @@ function restoreReadingAnnotations() {
   }
 }
 
+const toggleExplanationPanel = () => {
+  explanationPanelExpanded.value = !explanationPanelExpanded.value
+  if (explanationPanelExpanded.value) {
+    resultPanelHeight.value = clampResultPanelHeight(resultPanelHeight.value)
+  }
+  persistReadingDraft()
+}
+
+const onResultResizerMouseDown = (event) => {
+  if (!canResizeResults.value) return
+  resultResizerActive = true
+  resultResizerStartY = event.clientY
+  resultResizerStartHeight = resultPanelHeight.value
+  document.body.style.userSelect = 'none'
+}
+
+const onResultResizerMouseMove = (event) => {
+  if (!resultResizerActive) return
+  const delta = resultResizerStartY - event.clientY
+  resultPanelHeight.value = clampResultPanelHeight(resultResizerStartHeight + delta)
+}
+
+const onResultResizerMouseUp = () => {
+  if (!resultResizerActive) return
+  resultResizerActive = false
+  document.body.style.userSelect = ''
+  persistReadingDraft()
+}
+
 const toggleOverride = (qId) => {
   if (!readingOverrides.value[qId]) {
     const userAnswer = answeredMap.value[qId] || '未作答';
@@ -480,7 +613,7 @@ const toggleOverride = (qId) => {
     
     saveExamRecord({
       timestamp: submissionTimestamp.value,
-      examId: examId,
+      examId: examId.value,
       title: examData.value.meta?.title || '未命名练习',
       subject: 'reading',
       part: examData.value.meta?.category || 'P1',
@@ -488,7 +621,7 @@ const toggleOverride = (qId) => {
       maxScore: examData.value.questionOrder.length,
       durationSecs: elapsedSeconds.value,
       routeTarget: {
-        path: `/exam/reading/${examId}`,
+        path: `/exam/reading/${examId.value}`,
       },
       answers: getReadingDraftSnapshot()
     });
@@ -697,7 +830,7 @@ const submitExam = () => {
     submissionTimestamp.value = ts;
     saveExamRecord({
       timestamp: ts,
-      examId: examId,
+      examId: examId.value,
       title: examData.value.meta?.title || '未命名练习',
       subject: 'reading',
       part: examData.value.meta?.category || 'P1',
@@ -705,25 +838,28 @@ const submitExam = () => {
       maxScore: examData.value.questionOrder.length,
       durationSecs: elapsedSeconds.value,
       routeTarget: {
-        path: `/exam/reading/${examId}`,
+        path: `/exam/reading/${examId.value}`,
       },
       answers: getReadingDraftSnapshot()
     });
-    clearDraftSession('reading', examId)
+    clearDraftSession('reading', examId.value)
   } catch (e) {
     console.error("Failed to save exam history", e);
   }
 
   alert(`批改完成！用时: ${formattedTime.value}，正确率: ${correctCount} / ${examData.value.questionOrder.length}`);
   activeExplanationQuestionId.value = examData.value?.questionOrder?.[0] || null
+  explanationPanelExpanded.value = true
+  resultPanelHeight.value = clampResultPanelHeight(resultPanelHeight.value)
+  persistReadingDraft()
 }
 
 const resetExam = () => {
   if (!confirm("确定要清除所有答题记录吗？")) return;
-  clearReadingAnnotationState(examId)
-  clearReadingDraftState(examId)
-  clearDraftSession('reading', examId)
-  window.location.reload();
+  clearReadingAnnotationState(examId.value)
+  clearReadingDraftState(examId.value)
+  clearDraftSession('reading', examId.value)
+  router.replace({ path: route.path, query: { reset: 'true' } })
 }
 
 const scrollToQuestion = (qId) => {
@@ -846,7 +982,31 @@ const scrollToQuestion = (qId) => {
 .shell {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
+}
+
+.horizontal-resizer {
+  flex: 0 0 10px;
+  position: relative;
+  cursor: row-resize;
+  background: transparent;
+}
+
+.horizontal-resizer::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--border, #d6dbe8);
+}
+
+.horizontal-resizer:hover::before {
+  background: var(--accent, #7c3aed);
 }
 
 .pane {
@@ -877,6 +1037,17 @@ const scrollToQuestion = (qId) => {
 }
 
 /* === Footer Nav === */
+.bottom-panel {
+  flex: 0 0 auto;
+}
+
+.bottom-panel.expanded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .footer {
   display: flex;
   align-items: center;
@@ -968,6 +1139,9 @@ const scrollToQuestion = (qId) => {
 }
 
 .explanation-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 0 24px 20px;
   background: var(--bg, #f7f6fa);
 }
@@ -983,6 +1157,10 @@ const scrollToQuestion = (qId) => {
 .explanation-header {
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--border, #e3e0ee);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .explanation-header h3 {
@@ -1236,6 +1414,46 @@ const scrollToQuestion = (qId) => {
   border-radius: 12px;
   margin-bottom: 24px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  overflow-x: auto !important; /* 防止大表格撑破布局 */
+}
+
+/* 修复表格题和填空题错位 */
+:deep(.group table) {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 16px 0 !important;
+  table-layout: auto !important;
+  font-size: 0.9em !important; /* 缩小表格字体 */
+}
+
+:deep(.group th), :deep(.group td) {
+  border: 1px solid var(--border, #e3e0ee) !important;
+  padding: 6px 8px !important; /* 缩小内边距使表格更紧凑 */
+  text-align: left !important;
+  vertical-align: middle !important;
+}
+
+:deep(.group th) {
+  background: var(--row-hover, #fdfcff) !important;
+  font-weight: 600 !important;
+}
+
+:deep(.group input[type="text"]) {
+  width: 120px !important;
+  max-width: 100% !important;
+  padding: 6px 10px !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
+  border-radius: 6px !important;
+  background: var(--surface, #ffffff) !important;
+  color: var(--text, #1c1a2e) !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+}
+
+:deep(.group input[type="text"]:focus) {
+  border-color: var(--accent, #7c3aed) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1) !important;
 }
 
 :deep(.paragraph-dropzone), :deep(.match-dropzone) {

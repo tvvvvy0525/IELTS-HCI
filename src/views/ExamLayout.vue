@@ -151,9 +151,6 @@
           <p class="header-kicker">IELTS Preparation</p>
           <h1>{{ currentRouteName }}</h1>
         </div>
-        <div class="header-right">
-          <span class="avatar">U</span>
-        </div>
       </header>
 
       <div class="page-container">

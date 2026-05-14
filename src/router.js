@@ -19,6 +19,8 @@ import HistoryView from './views/HistoryView.vue'
 import IeltsIntroView from './views/IeltsIntroView.vue'
 import ToolsView from './views/ToolsView.vue'
 import SettingsView from './views/SettingsView.vue'
+import MockTestConfigView from './views/MockTestConfigView.vue'
+import MockTestResultView from './views/MockTestResultView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -59,6 +61,8 @@ const router = createRouter({
         { path: 'intro', name: 'exam-intro', component: IeltsIntroView },
         { path: 'tools', name: 'exam-tools', component: ToolsView },
         { path: 'settings', name: 'exam-settings', component: SettingsView },
+        { path: 'mock-test', name: 'exam-mock-test', component: MockTestConfigView },
+        { path: 'mock-result', name: 'exam-mock-result', component: MockTestResultView },
       ],
     },
     {

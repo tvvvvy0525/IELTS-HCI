@@ -17,6 +17,15 @@
       <input v-model="goals.examDate" type="date" class="input" @change="saveGoals" />
     </label>
     <label class="setting-item">
+      <span>词汇复习模式</span>
+      <small class="setting-help">自动推荐时，距离考试 60 天及以上优先使用艾宾浩斯背词，否则默认迅速刷词；你也可以手动固定模式。</small>
+      <select v-model="vocabularySettings.reviewMode" class="input" @change="saveVocabularySettings">
+        <option value="auto">自动推荐</option>
+        <option value="ebbinghaus">艾宾浩斯背词</option>
+        <option value="quick">迅速刷词</option>
+      </select>
+    </label>
+    <label class="setting-item">
       <span>AI 反馈模式</span>
       <small class="setting-help">“手动评分”适合先跑通流程；“Ollama 本地模型”适合想直接用 AI 自动批改时使用。</small>
       <select v-model="settings.provider" class="input" @change="saveSettings">
@@ -124,6 +133,7 @@ import { getSpeakingSettings, setSpeakingSettings } from '../utils/speakingSetti
 import { pingLocalAsr, pingServerAsr } from '../utils/speakingAsrProviders.js';
 import { getUserGoals, setUserGoals } from '../utils/userGoals.js';
 import { vocabularyStore } from '../utils/vocabularyStore.js';
+import { getVocabularySettings, setVocabularySettings } from '../utils/vocabularySettings.js';
 
 const settings = ref({
   provider: 'manual',
@@ -141,6 +151,9 @@ const goals = ref({
   targetBand: '6.5',
   examDate: '',
 });
+const vocabularySettings = ref({
+  reviewMode: 'auto',
+});
 
 
 
@@ -151,6 +164,10 @@ function saveSettings() {
 function saveGoals() {
   setUserGoals(goals.value);
   vocabularyStore.setExamDate(goals.value.examDate || '');
+}
+
+function saveVocabularySettings() {
+  setVocabularySettings(vocabularySettings.value);
 }
 
 async function testConnection() {
@@ -195,9 +212,11 @@ const asrTesting = ref({ local: false, server: false });
 const asrStatus = ref({ local: null, server: null });
 
 onMounted(() => {
+  vocabularyStore.syncExamDateWithUserGoals();
   const current = getAiSettings();
   settings.value = { ...current };
   goals.value = { ...getUserGoals() };
+  vocabularySettings.value = { ...getVocabularySettings() };
   const asrCurrent = getSpeakingSettings();
   asrSettings.value = { ...asrCurrent };
 });

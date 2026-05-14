@@ -25,12 +25,17 @@
         </p>
         <p class="dashboard-helper">不知道先做什么时，直接点“开始今日任务”，系统会按推荐顺序带你开始。</p>
       </div>
-      <button class="primary-btn" type="button" @click="startPractice">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
-        {{ stats.latestDraft ? '继续未完成练习' : '开始今日任务' }}
-      </button>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button class="primary-btn" type="button" @click="startPractice">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          {{ stats.latestDraft ? '继续未完成练习' : '开始今日任务' }}
+        </button>
+        <button class="ghost-btn" type="button" @click="router.push('/exam/mock-test')" style="display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 9px; min-height: 34px;">
+          <span>🎲</span> 随机组卷模考
+        </button>
+      </div>
     </section>
 
     <div class="summary-cards">
@@ -42,10 +47,10 @@
               <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
             </svg>
           </div>
-          <div class="stat-title">练习记录</div>
+          <div class="stat-title">已完成题目数</div>
         </div>
-        <div class="stat-value">{{ stats.totalSessions }}</div>
-        <div class="stat-trend">累计完成篇数</div>
+        <div class="stat-value">{{ stats.completedUniqueCount }}</div>
+        <div class="stat-trend">按唯一题目去重统计</div>
       </div>
 
       <div class="card stat-card">
@@ -55,10 +60,13 @@
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </div>
-          <div class="stat-title">平均正确率</div>
+          <div class="stat-title">客观题表现</div>
         </div>
-        <div class="stat-value">{{ stats.avgAccuracy }}<span class="unit">%</span></div>
-        <div class="stat-trend">基于已完成练习</div>
+        <div class="dual-stat-line">
+          <span>阅读 {{ readingStats.accuracy }}%</span>
+          <span>听力 {{ listeningStats.accuracy }}%</span>
+        </div>
+        <div class="stat-trend">阅读 / 听力平均正确率</div>
       </div>
 
       <div class="card stat-card">
@@ -75,7 +83,7 @@
         <div class="stat-trend">累计有效学习</div>
       </div>
 
-      <div class="card stat-card">
+      <div class="card stat-card clickable" @click="openStreakCalendar">
         <div class="stat-header">
           <div class="stat-icon speaking">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,7 +93,7 @@
           <div class="stat-title">连续学习</div>
         </div>
         <div class="stat-value">{{ stats.streak }}<span class="unit"> 天</span></div>
-        <div class="stat-trend">从今天开始</div>
+        <div class="stat-trend">点击查看日历</div>
       </div>
     </div>
 
@@ -94,39 +102,65 @@
         subject="reading"
         title="阅读专项"
         :duration="readingStats.duration"
-        :accuracy="readingStats.accuracy"
         :count="readingStats.count"
+        metric-label="正确率"
+        :metric-value="readingStats.accuracy"
+        metric-suffix="%"
+        :progress-current="readingStats.progressCurrent"
+        :progress-total="readingStats.progressTotal"
         :parts="readingStats.parts"
       />
       <SubjectProgress
         subject="listening"
         title="听力专项"
         :duration="listeningStats.duration"
-        :accuracy="listeningStats.accuracy"
         :count="listeningStats.count"
+        metric-label="正确率"
+        :metric-value="listeningStats.accuracy"
+        metric-suffix="%"
+        :progress-current="listeningStats.progressCurrent"
+        :progress-total="listeningStats.progressTotal"
         :parts="listeningStats.parts"
       />
       <SubjectProgress
         subject="writing"
         title="写作专项"
         :duration="writingStats.duration"
-        :accuracy="null"
         :count="writingStats.count"
+        metric-label="平均分"
+        :metric-value="writingStats.averageBand"
+        metric-suffix=" Band"
+        empty-metric-label="平均分"
+        empty-metric-text="暂无评分"
+        :progress-current="writingStats.count"
+        :progress-total="writingStats.progressTotal"
         :parts="writingStats.parts"
       />
       <SubjectProgress
         subject="speaking"
         title="口语专项"
         :duration="speakingStats.duration"
-        :accuracy="null"
         :count="speakingStats.count"
+        metric-label="平均分"
+        :metric-value="speakingStats.averageBand"
+        metric-suffix=" Band"
+        empty-metric-label="平均分"
+        empty-metric-text="暂无评分"
+        :progress-current="speakingStats.count"
+        :progress-total="speakingStats.progressTotal"
         :parts="speakingStats.parts"
       />
     </div>
 
     <WritingTrendChart
+      :title="trendTitle"
       :labels="trendData.labels"
       :data-points="trendData.data"
+      :metric-type="trendData.metricType"
+      :tabs="trendTabs"
+      :active-tab="activeTrendModule"
+      :empty-text="trendEmptyText"
+      @change-tab="handleTrendTabChange"
     />
 
     <section class="card vocabulary-entry-card">
@@ -146,8 +180,42 @@
       </button>
     </section>
 
+    <!-- 连续学习火苗日历弹窗 -->
+    <div v-if="showStreakCalendar" class="intro-modal-overlay" @click.self="showStreakCalendar = false">
+      <div class="intro-modal-card calendar-modal">
+        <h3>学习火苗日历</h3>
+        <p class="freeze-info">
+          可用补签卡：<strong>{{ availableStreakFreezes }}</strong> 张 
+          <span class="helper-text">(每学 100 分钟送 1 张)</span>
+        </p>
+        <div class="calendar-header">
+          <button type="button" @click="prevMonth">&lt;</button>
+          <span>{{ currentYear }}年{{ currentMonth + 1 }}月</span>
+          <button type="button" @click="nextMonth">&gt;</button>
+        </div>
+        <div class="calendar-grid">
+          <div class="weekday" v-for="d in weekdays" :key="d">{{ d }}</div>
+          <div 
+            v-for="day in calendarDays" 
+            :key="day.dateStr" 
+            :class="['calendar-day', { 
+              'is-empty': !day.day, 
+              'has-streak': day.hasStreak,
+              'can-freeze': !day.hasStreak && day.day && isPastDate(day.dateStr) && availableStreakFreezes > 0
+            }]"
+            @click="(!day.hasStreak && day.day && isPastDate(day.dateStr)) ? useStreakFreeze(day.dateStr) : null"
+          >
+            <span v-if="day.day">{{ day.day }}</span>
+            <span v-if="day.hasStreak" class="streak-fire">🔥</span>
+            <span v-if="!day.hasStreak && day.day && isPastDate(day.dateStr) && availableStreakFreezes > 0" class="streak-add">+</span>
+          </div>
+        </div>
+        <button class="primary-btn" @click="showStreakCalendar = false" style="width: 100%; margin-top: 20px;">
+          关闭
+        </button>
+      </div>
+    </div>
 
-  </div>
   <OnboardingWizard v-if="showOnboarding" @done="handleOnboardingDone" />
 
   <!-- 新手入口隐藏提示弹窗 -->
@@ -186,6 +254,7 @@
       </button>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup>
@@ -195,20 +264,24 @@ import SubjectProgress from '../components/SubjectProgress.vue'
 import WritingTrendChart from '../components/WritingTrendChart.vue'
 import OnboardingWizard from '../components/OnboardingWizard.vue'
 import { WRITING_FEEDBACK_UPDATED_EVENT, getFeedbackList } from '../utils/writingFeedback.js'
-import { WRITING_PRACTICES_UPDATED_EVENT, getPractices } from '../utils/writingPractice.js'
+import { WRITING_PRACTICES_UPDATED_EVENT, getPractices, getSeedPrompts } from '../utils/writingPractice.js'
 import { getWritingDashboardStats, getWritingTrendData } from '../utils/writingProgress.js'
 import { vocabularyStore } from '../utils/vocabularyStore.js'
 import { getOnboardingState } from '../utils/onboardingState.js'
 import { getTodayStudyRoute } from '../utils/studyFlow.js'
+import { getTopicList } from '../utils/speakingPractice.js'
+import { getReadingDraftState } from '../utils/readingDraftState.js'
 import {
   EXAM_DRAFTS_UPDATED_EVENT,
-  getLatestDraftSession,
+  getDraftSessions,
 } from '../utils/examDrafts.js'
 import {
   EXAM_HISTORY_UPDATED_EVENT,
   getExamHistory,
   getExamStats,
   getSubjectStats,
+  getUniqueSubjectCount,
+  saveExamRecord,
 } from '../utils/examHistory.js'
 
 const router = useRouter()
@@ -233,6 +306,7 @@ const daysRemaining = computed(() => {
 
 const stats = reactive({
   totalSessions: 0,
+  completedUniqueCount: 0,
   avgAccuracy: 0,
   totalMinutes: 0,
   streak: 0,
@@ -245,6 +319,8 @@ const readingStats = reactive({
   duration: 0,
   accuracy: 0,
   count: 0,
+  progressCurrent: 0,
+  progressTotal: 0,
   parts: ['P1: 0%', 'P2: 0%', 'P3: 0%'],
 })
 
@@ -252,13 +328,16 @@ const listeningStats = reactive({
   duration: 0,
   accuracy: 0,
   count: 0,
+  progressCurrent: 0,
+  progressTotal: 0,
   parts: ['P1: 0%', 'P2: 0%', 'P3: 0%', 'P4: 0%'],
 })
 
 const writingStats = reactive({
   duration: 0,
-  accuracy: null,
   count: 0,
+  progressTotal: 0,
+  averageBand: null,
   parts: ['Task 1 待练习', 'Task 2 待练习'],
   latestBand: null,
   latestPracticeId: '',
@@ -267,21 +346,126 @@ const writingStats = reactive({
 
 const speakingStats = reactive({
   duration: 0,
-  accuracy: null,
   count: 0,
-  parts: ['Part1: 0%', 'Part2: 0%', 'Part3: 0%'],
+  progressTotal: 0,
+  averageBand: null,
+  parts: ['Part1: 0', 'Part2: 0', 'Part3: 0'],
 })
 
 const trendData = reactive({
   labels: [],
   data: [],
+  metricType: 'band',
 })
+const activeTrendModule = ref('writing')
+const trendTabs = [
+  { value: 'reading', label: '阅读' },
+  { value: 'listening', label: '听力' },
+  { value: 'writing', label: '写作' },
+  { value: 'speaking', label: '口语' },
+]
 
 const onboardingState = reactive(getOnboardingState())
 const showOnboarding = computed(() => !onboardingState.completed)
 
 const isIntroHidden = ref(localStorage.getItem('hide_dashboard_intro') === 'true')
 const showIntroDialog = ref(false)
+
+// 连续学习日历状态
+const showStreakCalendar = ref(false)
+const currentDate = ref(new Date())
+
+const usedStreakFreezes = ref(Number(localStorage.getItem('used_streak_freezes') || 0))
+
+const availableStreakFreezes = computed(() => {
+  const totalEarned = Math.floor(stats.totalMinutes / 100) + 1 // 初始赠送 1 张
+  const available = totalEarned - usedStreakFreezes.value
+  return available > 0 ? available : 0
+})
+
+function isPastDate(dateStr) {
+  const today = new Date().toISOString().slice(0, 10)
+  return dateStr < today
+}
+
+function useStreakFreeze(dateStr) {
+  if (availableStreakFreezes.value <= 0) {
+    alert('补签卡不足，多学习积累时长吧！')
+    return
+  }
+  
+  if (!confirm(`确定要消耗 1 张补签卡，补上 ${dateStr} 的火苗吗？`)) {
+    return
+  }
+  
+  // 1. 插入虚拟记录
+  const record = {
+    timestamp: `${dateStr}T12:00:00.000Z`,
+    subject: 'streak_freeze',
+    title: '使用补签卡',
+    durationSecs: 0,
+    accuracy: null,
+    examId: `freeze-${dateStr}`
+  }
+  
+  saveExamRecord(record)
+  
+  // 2. 更新已使用数量
+  usedStreakFreezes.value += 1
+  localStorage.setItem('used_streak_freezes', usedStreakFreezes.value)
+  
+  // 3. 触发刷新
+  refreshDashboard()
+  alert('补签成功！')
+}
+
+const currentYear = computed(() => currentDate.value.getFullYear())
+const currentMonth = computed(() => currentDate.value.getMonth())
+
+const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+
+const streakDates = computed(() => {
+  if (!stats.fullHistory) return new Set()
+  return new Set(stats.fullHistory.map(record => record.timestamp.slice(0, 10)))
+})
+
+const calendarDays = computed(() => {
+  const year = currentYear.value
+  const month = currentMonth.value
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  
+  const days = []
+  
+  // 填充月初空白
+  for (let i = 0; i < firstDay; i++) {
+    days.push({ day: null, dateStr: `empty-${i}` })
+  }
+  
+  // 填充日期
+  for (let i = 1; i <= daysInMonth; i++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`
+    days.push({
+      day: i,
+      dateStr,
+      hasStreak: streakDates.value.has(dateStr)
+    })
+  }
+  
+  return days
+})
+
+function prevMonth() {
+  currentDate.value = new Date(currentYear.value, currentMonth.value - 1, 1)
+}
+
+function nextMonth() {
+  currentDate.value = new Date(currentYear.value, currentMonth.value + 1, 1)
+}
+
+function openStreakCalendar() {
+  showStreakCalendar.value = true
+}
 
 function hideIntro() {
   showIntroDialog.value = true
@@ -307,19 +491,151 @@ const recentSummary = computed(() => {
   return `最近完成：${recentRecord.title}，正确率 ${recentRecord.accuracy}%。`
 })
 
-function refreshDashboard() {
+const trendTitle = computed(() => ({
+  reading: '阅读正确率趋势',
+  listening: '听力正确率趋势',
+  writing: '写作分数趋势',
+  speaking: '口语分数趋势',
+}[activeTrendModule.value] || '趋势图'))
+
+const trendEmptyText = computed(() => ({
+  reading: '暂无阅读记录，快去完成第一篇阅读吧！',
+  listening: '暂无听力记录，快去完成第一篇听力吧！',
+  writing: '暂无已批改的写作记录，快去完成第一篇作文吧！',
+  speaking: '暂无口语记录，快去完成第一次口语练习吧！',
+}[activeTrendModule.value] || '暂无数据'))
+
+function resolveLatestValidDraft(history = [], practices = []) {
+  const drafts = getDraftSessions()
+  return drafts.find((draft) => {
+    if (draft.subject === 'writing') {
+      const practice = practices.find((item) => item.id === draft.examId)
+      return practice && practice.status !== 'submitted' && practice.status !== 'reviewed'
+    }
+
+    if (draft.subject === 'reading') {
+      const draftState = getReadingDraftState(draft.examId)
+      return !draftState.isSubmitted
+    }
+
+    const latestRecord = history
+      .filter((record) => record.subject === draft.subject && record.examId === draft.examId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+
+    if (!latestRecord) return true
+    return new Date(draft.updatedAt).getTime() > new Date(latestRecord.timestamp).getTime()
+  }) || null
+}
+
+function getTrendData(records = []) {
+  if (activeTrendModule.value === 'writing') {
+    return {
+      ...getWritingTrendData(getPractices(), getFeedbackList()),
+      metricType: 'band',
+    }
+  }
+
+  if (activeTrendModule.value === 'speaking') {
+    const speakingRecords = records
+      .filter((record) => record.subject === 'speaking' && Number.isFinite(Number(record.score)))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    return {
+      labels: speakingRecords.map((record) => {
+        const date = new Date(record.timestamp)
+        return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} (${record.part})`
+      }),
+      data: speakingRecords.map((record) => Number(record.score)),
+      metricType: 'band',
+    }
+  }
+
+  const subjectRecords = records
+    .filter((record) => record.subject === activeTrendModule.value && Number.isFinite(Number(record.accuracy)))
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  return {
+    labels: subjectRecords.map((record) => {
+      const date = new Date(record.timestamp)
+      return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} (${record.part})`
+    }),
+    data: subjectRecords.map((record) => Number(record.accuracy)),
+    metricType: 'accuracy',
+  }
+}
+
+function getSpeakingDashboardStats(records = []) {
+  const speakingRecords = records.filter((record) => record.subject === 'speaking')
+  const uniqueCount = new Set(speakingRecords.map((record) => record.title).filter(Boolean)).size
+  const totalDurationSecs = speakingRecords.reduce((sum, record) => sum + Number(record.durationSecs || 0), 0)
+  const scoredRecords = speakingRecords.filter((record) => Number.isFinite(Number(record.score)))
+  const averageBand = scoredRecords.length
+    ? Math.round((scoredRecords.reduce((sum, record) => sum + Number(record.score), 0) / scoredRecords.length) * 10) / 10
+    : null
+
+  return {
+    count: uniqueCount,
+    duration: Math.round(totalDurationSecs / 60),
+    progressTotal: getTopicList().length,
+    averageBand,
+    parts: ['Part1', 'Part2', 'Part3'].map((part) => {
+      const partRecords = scoredRecords.filter((record) => record.part === part)
+      if (!partRecords.length) return `${part}: 0`
+      const avg = Math.round((partRecords.reduce((sum, record) => sum + Number(record.score), 0) / partRecords.length) * 10) / 10
+      return `${part}: ${avg}`
+    }),
+  }
+}
+
+async function refreshDashboard() {
   Object.assign(stats, getExamStats())
-  Object.assign(readingStats, getSubjectStats('reading'))
-  Object.assign(listeningStats, getSubjectStats('listening'))
-  Object.assign(writingStats, getWritingDashboardStats(getPractices(), getFeedbackList()))
-  Object.assign(speakingStats, getSubjectStats('speaking'))
+  const history = getExamHistory()
+  stats.completedUniqueCount = new Set(
+    history.map((record) => {
+      if (record.subject === 'writing') return `writing:${record.routeTarget?.query?.practiceId || record.examId || record.title}`
+      if (record.subject === 'speaking') return `speaking:${record.title || record.examId}`
+      return `${record.subject}:${record.examId}`
+    }),
+  ).size
+  const practices = getPractices()
+  const feedbackList = getFeedbackList()
+  await Promise.all([
+    import('../generated/reading-exams/manifest.js'),
+    import('../generated/listening-exams/manifest.js'),
+  ])
+  const readingManifest = window.__READING_EXAM_MANIFEST__ || {}
+  const listeningManifest = window.__LISTENING_EXAM_MANIFEST__ || {}
+  Object.assign(readingStats, {
+    ...getSubjectStats('reading'),
+    count: getUniqueSubjectCount('reading'),
+    progressCurrent: getUniqueSubjectCount('reading'),
+    progressTotal: Object.keys(readingManifest).length,
+  })
+  Object.assign(listeningStats, {
+    ...getSubjectStats('listening'),
+    count: getUniqueSubjectCount('listening'),
+    progressCurrent: getUniqueSubjectCount('listening'),
+    progressTotal: Object.keys(listeningManifest).length,
+  })
+  Object.assign(writingStats, {
+    ...getWritingDashboardStats(practices, feedbackList),
+    progressTotal: (() => {
+      const prompts = getSeedPrompts()
+      return (prompts.task1?.length || 0) + (prompts.task2?.length || 0)
+    })(),
+  })
+  Object.assign(speakingStats, getSpeakingDashboardStats(history))
   
-  const newTrendData = getWritingTrendData(getPractices(), getFeedbackList())
+  const newTrendData = getTrendData(history)
   trendData.labels = newTrendData.labels
   trendData.data = newTrendData.data
+  trendData.metricType = newTrendData.metricType
 
-  stats.latestDraft = getLatestDraftSession()
-  stats.fullHistory = getExamHistory()
+  stats.latestDraft = resolveLatestValidDraft(history, practices)
+  stats.fullHistory = history
+}
+
+function handleTrendTabChange(value) {
+  activeTrendModule.value = value
+  refreshDashboard()
 }
 
 async function startPractice() {
@@ -380,6 +696,16 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.6;
+}
+
+.dual-stat-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
 }
 
 .vocabulary-entry-card {
@@ -607,5 +933,131 @@ onUnmounted(() => {
 @keyframes slideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* 连续学习火苗日历样式 */
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.calendar-modal {
+  width: 360px !important;
+  max-width: 90vw;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.calendar-header button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 5px 15px;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.calendar-header button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.calendar-header span {
+  font-weight: bold;
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.weekday {
+  font-weight: bold;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding-bottom: 5px;
+}
+
+.calendar-day {
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 0.9rem;
+  color: var(--text);
+  transition: background-color 0.2s;
+}
+
+.calendar-day.is-empty {
+  background: transparent;
+}
+
+.calendar-day.has-streak {
+  background: rgba(255, 94, 98, 0.1);
+  color: #ff5e62;
+  font-weight: bold;
+}
+
+.streak-fire {
+  position: absolute;
+  font-size: 0.8rem;
+  bottom: 2px;
+  right: 2px;
+}
+
+/* 补签卡样式 */
+.freeze-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 15px;
+  text-align: center;
+}
+.freeze-info strong {
+  color: #ff5e62;
+  font-size: 1.1rem;
+}
+.freeze-info .helper-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.calendar-day.can-freeze {
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.02);
+}
+.calendar-day.can-freeze:hover {
+  background: rgba(255, 94, 98, 0.05);
+}
+
+.streak-add {
+  position: absolute;
+  font-size: 0.8rem;
+  bottom: 2px;
+  right: 2px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.calendar-day.can-freeze:hover .streak-add {
+  color: #ff5e62;
+  opacity: 1;
 }
 </style>

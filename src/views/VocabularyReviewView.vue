@@ -17,7 +17,9 @@
         <span class="label">今日达成:</span>
         <span class="count">{{ state.dailyProgress.knownCount }} / {{ state.dailyGoal }}</span>
         <span class="badge" v-if="isGoalMet">已达标</span>
+        <span class="mode-badge">{{ activeModeLabel }}</span>
       </div>
+      <p class="mode-desc">{{ activeModeDescription }}</p>
       <div class="progress-bar">
         <div class="bar-fill" :style="{ width: progressPercentage + '%' }"></div>
       </div>
@@ -95,7 +97,7 @@
         您已达成了今日新增 {{ state.dailyGoal }} 个掌握单词的目标。
       </p>
       <p class="text-secondary" v-else>
-        当前队列中已无需要复习的单词。
+        {{ activeMode === 'ebbinghaus' ? '今天到期的复习词已经完成，新的间隔任务会在后续日期自动出现。' : '当前队列中已无需要复习的单词。' }}
       </p>
       <div class="completed-actions">
         <RouterLink to="/exam/vocabulary" class="primary-btn">返回看板</RouterLink>
@@ -122,11 +124,13 @@ import { RouterLink, useRouter } from 'vue-router';
 import { vocabularyStore } from '../utils/vocabularyStore.js';
 import { getExamHistory } from '../utils/examHistory.js';
 import { getTodayStudyRoute } from '../utils/studyFlow.js';
+import { getVocabularySettings } from '../utils/vocabularySettings.js';
 
 const router = useRouter();
 
 // 获取 Store 状态
 const state = vocabularyStore.state;
+const activeMode = ref(vocabularyStore.getEffectiveMode(getVocabularySettings().reviewMode));
 
 function goBack() {
   router.push('/exam/vocabulary');
@@ -158,10 +162,15 @@ const isGoalMet = computed(() => {
   return state.dailyProgress.knownCount >= state.dailyGoal;
 });
 const showGoalCompleteModal = ref(false);
+const activeModeLabel = computed(() => activeMode.value === 'ebbinghaus' ? '艾宾浩斯背词' : '迅速刷词');
+const activeModeDescription = computed(() => activeMode.value === 'ebbinghaus'
+  ? '优先安排今天到期的词，再补充新的词汇任务。'
+  : '优先处理模糊词，再快速推进新的词汇。');
 
 // 初始化加载队列
 function initQueue() {
-  taskQueue.value = vocabularyStore.getTodayTasks();
+  activeMode.value = vocabularyStore.getEffectiveMode(getVocabularySettings().reviewMode);
+  taskQueue.value = vocabularyStore.getTodayTasks({ mode: activeMode.value });
   currentIndex.value = 0;
   isFlipped.value = false;
 }
@@ -196,7 +205,7 @@ function handleChoice(choice) {
   const prevKnownCount = Number(state.dailyProgress.knownCount || 0);
   
   // 更新状态
-  vocabularyStore.updateWordStatus(currentWord.value.id, choice);
+  vocabularyStore.updateWordStatus(currentWord.value.id, choice, { mode: activeMode.value });
   const nextKnownCount = Number(state.dailyProgress.knownCount || 0);
   const justReachedGoal = prevKnownCount < state.dailyGoal && nextKnownCount >= state.dailyGoal;
   if (justReachedGoal) {
@@ -213,7 +222,7 @@ function handleChoice(choice) {
     // 如果队列过完了，但还没达标，可以考虑重新拉取一次队列（可能有新词或复习词）
     if (currentIndex.value >= taskQueue.value.length) {
       // 重新拉取，看看有没有漏网之鱼
-      const remaining = vocabularyStore.getTodayTasks();
+      const remaining = vocabularyStore.getTodayTasks({ mode: activeMode.value });
       if (remaining.length > 0) {
         taskQueue.value = remaining;
         currentIndex.value = 0;
@@ -307,6 +316,21 @@ function goNextTask() {
   padding: 2px 6px;
   border-radius: 6px;
   font-weight: 760;
+}
+
+.mode-badge {
+  font-size: 0.75rem;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 760;
+}
+
+.mode-desc {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
 .progress-bar {

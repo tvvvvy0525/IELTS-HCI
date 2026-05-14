@@ -48,7 +48,7 @@
             <td><span class="tag" :class="tagClass">{{ subjectLabel }}</span></td>
             <td><span class="freq">{{ item.category || '-' }}</span></td>
             <td class="exam-title">{{ item.title }}</td>
-            <td><span class="status-pill">未练习</span></td>
+            <td><span class="status-pill" :class="item.statusClass || ''">{{ item.statusLabel || '未练习' }}</span></td>
             <td><button class="action-btn" type="button" @click="$emit('start', item)">开始</button></td>
           </tr>
           <tr v-if="filteredItems.length === 0">

@@ -95,12 +95,12 @@
           <audio :src="lastAudioUrl" controls></audio>
         </div>
 
-        <!-- 降级提示 -->
         <div v-if="fallbackMessage" class="fallback-alert">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
           {{ fallbackMessage }}
+          <button v-if="fallbackMessage.includes('麦克风')" class="ghost-btn-small" style="margin-left: 8px; border-color: var(--warning); color: var(--warning); padding: 1px 6px; font-size: 11px;" @click="showMicFixModal = true">去修复</button>
         </div>
 
         <!-- 手动输入区（降级） -->
@@ -179,6 +179,84 @@
       <p class="done-desc">正在生成评分报告...</p>
       <div class="loading-spinner"></div>
     </div>
+
+    <!-- 麦克风权限修复弹窗 -->
+    <div v-if="showMicFixModal" class="wizard-backdrop" @click="showMicFixModal = false">
+      <div class="wizard-card" @click.stop style="max-width: 750px; width: 92vw;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+          <h3 style="margin: 0; color: var(--accent);">如何恢复麦克风权限？</h3>
+          <button style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);" @click="showMicFixModal = false">&times;</button>
+        </div>
+        
+        <div style="display: flex; gap: 20px; flex-direction: row;" class="responsive-flex">
+          <!-- 左侧：文字说明 -->
+          <div style="flex: 1.2; padding: 10px 0;">
+            <p style="margin-bottom: 15px; color: var(--text-secondary); font-size: 14px;">如果您不小心拒绝了麦克风权限，可以按照以下步骤恢复：</p>
+            
+            <div style="background: var(--surface-hover); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+              <p style="font-weight: 600; margin-bottom: 8px; color: var(--accent); font-size: 14px;">Chrome / Edge 浏览器：</p>
+              <ol style="padding-left: 20px; color: var(--text-secondary); line-height: 1.6; font-size: 13px;">
+                <li>点击浏览器地址栏左侧的 🔒 <strong>锁图标</strong> 或 ⓘ <strong>图标</strong>。</li>
+                <li>找到 <strong>麦克风</strong>（Microphone）选项。</li>
+                <li>将其状态改为 <strong>允许</strong>（Allow）。</li>
+                <li>刷新页面重新开始练习。</li>
+              </ol>
+            </div>
+
+            <div style="background: var(--surface-hover); padding: 15px; border-radius: 8px;">
+              <p style="font-weight: 600; margin-bottom: 8px; color: var(--accent); font-size: 14px;">Safari 浏览器：</p>
+              <ol style="padding-left: 20px; color: var(--text-secondary); line-height: 1.6; font-size: 13px;">
+                <li>点击菜单栏的 <strong>Safari 浏览器</strong> -> <strong>偏好设置</strong>。</li>
+                <li>切换到 <strong>网站</strong> 标签页，点击左侧的 <strong>麦克风</strong>。</li>
+                <li>在右侧找到当前网站，改为 <strong>允许</strong>。</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- 右侧：纯 CSS 动画演示 -->
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; height: 320px; overflow: hidden; position: relative;" class="animation-container">
+            <!-- 模拟浏览器外壳 -->
+            <div class="browser-mockup">
+              <!-- 地址栏 -->
+              <div class="mock-address-bar">
+                <div class="mock-lock-icon">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="mock-url">localhost:5173</div>
+              </div>
+              
+              <!-- 模拟下拉菜单 -->
+              <div class="mock-dropdown">
+                <div class="mock-dropdown-header">网站设置</div>
+                <div class="mock-dropdown-item item-mic">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v10m0 0a3 3 0 0 1-3-3V4a3 3 0 0 1 6 0v4a3 3 0 0 1-3 3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 21v2m-4 0h8"></path></svg>
+                    <span>麦克风</span>
+                  </div>
+                  <div class="mock-switch"></div>
+                </div>
+                <div class="mock-dropdown-item" style="opacity: 0.5;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>摄像头</span>
+                  </div>
+                  <div class="mock-switch" style="background: #ccc;"></div>
+                </div>
+              </div>
+              
+              <!-- 模拟光标 -->
+              <div class="mock-cursor">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="#333" stroke="white" stroke-width="1.5" stroke-linejoin="round"><path d="M5.5 2v17l4.5-4.5 3.5 8 2.5-1 3.5-8.5h-7z"></path></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
+          <button class="primary-btn" @click="showMicFixModal = false">我知道了</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -198,6 +276,7 @@ import { stopBrowserAsr } from '../../utils/speakingAsrProviders.js'
 import { calcRuleBasedFeedback, buildFeedbackSummary } from '../../utils/speakingFeedback.js'
 import { saveExamRecord } from '../../utils/examHistory.js'
 import { getSpeakingSettings } from '../../utils/speakingSettings.js'
+import { saveAudio } from '../../utils/audioStorage.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -222,20 +301,48 @@ function handleQuestionAction() {
   }
 }
 
+let currentUtterance = null // 提升变量，防止垃圾回收导致怪音
+
 function speakText(text, callback) {
   if (!text) return
   // 先停止之前的朗读
   window.speechSynthesis.cancel()
 
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'en-GB' // 雅思优先用英音
-  utterance.rate = 0.9 // 语速略慢
+  // 延时一小会儿再播放，防止 cancel 刚执行完就 speak 导致底层缓冲区错乱产生机械音/电流音
+  setTimeout(() => {
+    currentUtterance = new SpeechSynthesisUtterance(text)
+    
+    const voices = window.speechSynthesis.getVoices()
+    const useUkMale = Math.random() < 0.5 // 50% 概率二选一
+    
+    let selectedVoice = null
+    
+    if (useUkMale) {
+      // 寻找英音男声：优先匹配名字包含 Daniel 或 Male 的 en-GB
+      selectedVoice = voices.find(v => v.lang.startsWith('en-GB') && (v.name.includes('Daniel') || v.name.toLowerCase().includes('male')))
+      // 兜底：只要是 en-GB
+      if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('en-GB'))
+      currentUtterance.lang = 'en-GB'
+    } else {
+      // 寻找美音女声：优先匹配名字包含 Samantha, Zira 或 Female 的 en-US
+      selectedVoice = voices.find(v => v.lang.startsWith('en-US') && (v.name.includes('Samantha') || v.name.includes('Zira') || v.name.toLowerCase().includes('female')))
+      // 兜底：只要是 en-US
+      if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('en-US'))
+      currentUtterance.lang = 'en-US'
+    }
+    
+    if (selectedVoice) {
+      currentUtterance.voice = selectedVoice
+    }
+    
+    currentUtterance.rate = 0.9 // 语速略慢
 
-  if (callback) {
-    utterance.onend = callback
-  }
+    if (callback) {
+      currentUtterance.onend = callback
+    }
 
-  window.speechSynthesis.speak(utterance)
+    window.speechSynthesis.speak(currentUtterance)
+  }, 150); // 给它 150ms 的喘息时间
 }
 
 // 会话与题卡
@@ -287,6 +394,7 @@ const currentTranscript = ref('')
 const needsManualInput = ref(false)
 const manualText = ref('')
 const fallbackMessage = ref('')
+const showMicFixModal = ref(false)
 const lastAudioUrl = ref('')
 
 // ASR 层级
@@ -384,6 +492,8 @@ async function stopRecording() {
   if (audioBlob) {
     if (lastAudioUrl.value) URL.revokeObjectURL(lastAudioUrl.value)
     lastAudioUrl.value = URL.createObjectURL(audioBlob)
+    // 持久化保存音频
+    saveAudio(session.value.sessionId, audioBlob)
   }
   stopBrowserAsr()
 
@@ -599,6 +709,16 @@ onMounted(() => {
     startPrepTimer()
   } else {
     phase.value = 'speaking'
+  }
+
+  // 预热 TTS 引擎，解决首次朗读延迟与“外星音”问题
+  try {
+    const warmUp = new SpeechSynthesisUtterance(' ')
+    warmUp.volume = 0
+    window.speechSynthesis.speak(warmUp)
+    window.speechSynthesis.getVoices() // 促使浏览器加载语音包
+  } catch (e) {
+    console.warn('TTS warm-up failed:', e)
   }
 })
 
@@ -1050,6 +1170,167 @@ onUnmounted(() => {
 }
 
 .blurred-text:hover {
-  filter: blur(4px); /* 悬浮时稍微清晰一点，提示可点击 */
+  filter: blur(4px);
+}
+
+.wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 20, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2200;
+}
+
+.wizard-card {
+  width: min(500px, 92vw);
+  padding: 22px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+}
+
+/* 浏览器模拟动画样式 */
+.browser-mockup {
+  width: 240px;
+  height: 200px;
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-color);
+}
+
+.mock-address-bar {
+  background: var(--surface-hover);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mock-lock-icon {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+}
+
+.mock-url {
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.mock-dropdown {
+  padding: 10px;
+  font-size: 12px;
+  position: absolute;
+  top: 32px;
+  left: 10px;
+  width: 180px;
+  background: var(--surface);
+  border-radius: 6px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  border: 1px solid var(--border-color);
+  z-index: 2;
+  transform-origin: top left;
+  animation: show-menu 4s infinite;
+}
+
+.mock-dropdown-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.mock-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  color: var(--text-secondary);
+}
+
+.mock-switch {
+  width: 24px;
+  height: 12px;
+  background: #ccc;
+  border-radius: 6px;
+  position: relative;
+  transition: background 0.3s;
+}
+
+.mock-switch::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+/* 动画帧 */
+@keyframes show-menu {
+  0%, 20% { transform: scale(0); opacity: 0; }
+  25%, 80% { transform: scale(1); opacity: 1; }
+  85%, 100% { transform: scale(0); opacity: 0; }
+}
+
+@keyframes toggle-switch {
+  0%, 50% { background: #ccc; }
+  55%, 100% { background: var(--accent); }
+}
+
+@keyframes toggle-knob {
+  0%, 50% { transform: translateX(0); }
+  55%, 100% { transform: translateX(12px); }
+}
+
+/* 应用动画到开关 */
+.item-mic .mock-switch {
+  animation: toggle-switch 4s infinite;
+}
+.item-mic .mock-switch::after {
+  animation: toggle-knob 4s infinite;
+}
+
+/* 光标 */
+.mock-cursor {
+  position: absolute;
+  z-index: 3;
+  color: white;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  pointer-events: none;
+  animation: move-cursor 4s infinite;
+}
+
+@keyframes move-cursor {
+  0% { top: 120px; left: 200px; }
+  15% { top: 15px; left: 15px; } /* 移到锁 */
+  20% { top: 15px; left: 15px; transform: scale(0.9); } /* 点击 */
+  25% { top: 15px; left: 15px; transform: scale(1); }
+  40% { top: 52px; left: 160px; } /* 移到开关 */
+  50% { top: 52px; left: 160px; transform: scale(0.9); } /* 拨动 */
+  55% { top: 52px; left: 160px; transform: scale(1); }
+  70% { top: 120px; left: 200px; } /* 移开 */
+  100% { top: 120px; left: 200px; }
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .responsive-flex {
+    flex-direction: column !important;
+  }
+  .animation-container {
+    height: 200px !important;
+  }
 }
 </style>

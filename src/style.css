@@ -747,6 +747,11 @@ button {
   font-weight: 700;
 }
 
+.status-pill.status-done {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
 /* ═══════════════════════════════════════
    CATALOG / TABLE
 ═══════════════════════════════════════ */

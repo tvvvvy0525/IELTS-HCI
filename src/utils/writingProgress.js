@@ -1,3 +1,5 @@
+import { getSeedPrompts } from './writingPractice.js'
+
 function normalizeTime(value) {
   const time = new Date(value || 0).getTime()
   return Number.isFinite(time) ? time : 0
@@ -36,23 +38,19 @@ function taskLabel(taskType) {
   return taskType === 'task1' ? 'Task 1' : 'Task 2'
 }
 
-function summarizeTaskStatus(taskType, practices, feedbackList) {
-  const taskPractices = practices
+function summarizeTaskBand(taskType, practices, feedbackList) {
+  const taskPracticeIds = practices
     .filter((item) => item.taskType === taskType)
-    .sort((a, b) => normalizeTime(b.updatedAt || b.createdAt) - normalizeTime(a.updatedAt || a.createdAt))
+    .map((item) => item.id)
 
-  const latestPractice = taskPractices[0]
-  if (!latestPractice) return `${taskLabel(taskType)} 待练习`
+  const taskFeedbacks = feedbackList.filter((item) => (
+    taskPracticeIds.includes(item.practiceId) && Number.isFinite(Number(item.bandOverall))
+  ))
 
-  const feedback = latestFeedbackForPractice(latestPractice.id, feedbackList)
-  if (feedback) {
-    const bandText = formatBand(feedback.bandOverall)
-    return `${taskLabel(taskType)} 已批改${bandText ? ` · Band ${bandText}` : ''}`
-  }
+  if (!taskFeedbacks.length) return `${taskLabel(taskType)}: 0`
 
-  if (latestPractice.status === 'submitted') return `${taskLabel(taskType)} 已提交`
-  if (latestPractice.status === 'in_progress') return `${taskLabel(taskType)} 进行中`
-  return `${taskLabel(taskType)} 草稿中`
+  const avgBand = Math.round((taskFeedbacks.reduce((sum, item) => sum + Number(item.bandOverall), 0) / taskFeedbacks.length) * 10) / 10
+  return `${taskLabel(taskType)}: ${avgBand}`
 }
 
 export function getWritingDashboardStats(practices = [], feedbackList = []) {
@@ -60,10 +58,17 @@ export function getWritingDashboardStats(practices = [], feedbackList = []) {
     (a, b) => normalizeTime(b.updatedAt || b.createdAt) - normalizeTime(a.updatedAt || a.createdAt),
   )
   const completedPractices = sortedPractices.filter((item) => item.status === 'submitted' || item.status === 'reviewed')
+  const uniquePromptCount = new Set(completedPractices.map((item) => item.promptId || item.prompt).filter(Boolean)).size
+  const promptBank = getSeedPrompts()
+  const totalPromptCount = (promptBank.task1?.length || 0) + (promptBank.task2?.length || 0)
 
   const latestPractice = sortedPractices[0] || null
   const latestFeedback = latestPractice ? latestFeedbackForPractice(latestPractice.id, feedbackList) : null
   const totalDurationSecs = completedPractices.reduce((sum, item) => sum + Number(item.durationSecs || 0), 0)
+  const validFeedbacks = feedbackList.filter((item) => Number.isFinite(Number(item.bandOverall)))
+  const averageBand = validFeedbacks.length
+    ? Math.round((validFeedbacks.reduce((sum, item) => sum + Number(item.bandOverall), 0) / validFeedbacks.length) * 10) / 10
+    : null
 
   let latestStatusLabel = '待开始'
   if (latestPractice) {
@@ -80,16 +85,18 @@ export function getWritingDashboardStats(practices = [], feedbackList = []) {
   }
 
   return {
-    count: completedPractices.length,
+    count: uniquePromptCount,
     duration: Math.round(totalDurationSecs / 60),
+    averageBand,
+    progressTotal: totalPromptCount,
     latestBand: latestFeedback && Number.isFinite(Number(latestFeedback.bandOverall))
       ? Number(latestFeedback.bandOverall)
       : null,
     latestPracticeId: latestPractice?.id || '',
     latestStatusLabel,
     parts: [
-      summarizeTaskStatus('task1', sortedPractices, feedbackList),
-      summarizeTaskStatus('task2', sortedPractices, feedbackList),
+      summarizeTaskBand('task1', completedPractices, feedbackList),
+      summarizeTaskBand('task2', completedPractices, feedbackList),
     ],
   }
 }

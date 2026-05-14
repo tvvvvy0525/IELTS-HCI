@@ -36,20 +36,20 @@
           <span class="so-label">学习时长</span>
           <span class="so-val">{{ duration }}<small style="font-size:0.75rem;font-weight:600;color:var(--text-muted)"> min</small></span>
         </div>
-        <div v-if="accuracy !== null" class="so-item">
-          <span class="so-label">正确率</span>
-          <span class="so-val" :class="`highlight-${subject}`">{{ accuracy }}%</span>
+        <div v-if="metricValue !== null" class="so-item">
+          <span class="so-label">{{ metricLabel }}</span>
+          <span class="so-val" :class="metricHighlightClass">{{ metricValue }}<small v-if="metricSuffix" style="font-size:0.75rem;font-weight:600;color:var(--text-muted)">{{ metricSuffix }}</small></span>
         </div>
         <div v-else class="so-item">
-          <span class="so-label">评分维度</span>
-          <span class="so-val" style="font-size:0.9rem;color:var(--text-muted)">AI 反馈</span>
+          <span class="so-label">{{ emptyMetricLabel }}</span>
+          <span class="so-val" style="font-size:0.9rem;color:var(--text-muted)">{{ emptyMetricText }}</span>
         </div>
       </div>
 
       <div class="progress-bar-wrap">
-        <div class="progress-bar" :class="subject" :style="{ width: `${Math.min(count, 100)}%` }"></div>
+        <div class="progress-bar" :class="subject" :style="{ width: `${progressPercent}%` }"></div>
       </div>
-      <div class="progress-footer">完成进度 {{ count }}/100</div>
+      <div class="progress-footer">完成进度 {{ progressCurrent }}/{{ progressTotal }}</div>
 
       <div class="part-accuracies">
         <div v-for="part in parts" :key="part" class="part-badge">{{ part }}</div>
@@ -59,7 +59,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   title: {
     type: String,
     required: true,
@@ -78,17 +80,48 @@ defineProps({
     type: Number,
     required: true,
   },
-  accuracy: {
-    type: Number,
-    default: null,
-  },
   count: {
     type: Number,
     required: true,
+  },
+  metricLabel: {
+    type: String,
+    default: '正确率',
+  },
+  metricValue: {
+    type: [Number, String],
+    default: null,
+  },
+  metricSuffix: {
+    type: String,
+    default: '',
+  },
+  emptyMetricLabel: {
+    type: String,
+    default: '评分维度',
+  },
+  emptyMetricText: {
+    type: String,
+    default: 'AI 反馈',
+  },
+  progressCurrent: {
+    type: Number,
+    default: 0,
+  },
+  progressTotal: {
+    type: Number,
+    default: 0,
   },
   parts: {
     type: Array,
     default: () => [],
   },
 })
+
+const progressPercent = computed(() => {
+  if (!props.progressTotal) return 0
+  return Math.min(100, Math.round((props.progressCurrent / props.progressTotal) * 100))
+})
+
+const metricHighlightClass = computed(() => props.metricSuffix ? '' : `highlight-${props.subject}`)
 </script>

@@ -35,12 +35,14 @@ import {
 } from '../../utils/examHistory.js'
 import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
 import { normalizeListeningAssetPath } from '../../utils/listeningAssetPath.js'
+import { isMockMode, getNextMockRoute } from '../../utils/mockTestFlow.js'
 
 const route = useRoute()
 const router = useRouter()
 const encodedPath = typeof route.query.path === 'string' ? route.query.path : ''
 const encodedTitle = route.query.title
 const examId = route.params.id
+const shouldOpenReview = route.query.review === 'true'
 
 const iframeRef = ref(null)
 const iframeRenderKey = ref(0)
@@ -60,9 +62,44 @@ const nextActions = computed(() => ([
   {
     label: '进入下一科',
     variant: 'ghost',
-    to: '/exam/writing',
+    to: isMockMode() ? getNextMockRoute() : '/exam/writing',
   },
 ]))
+
+function captureListeningReviewPayload() {
+  if (!iframeRef.value) return null
+
+  try {
+    const doc = iframeRef.value.contentDocument
+    const script = doc?.getElementById('task-configuration')
+    if (!script) return null
+
+    const rawText = script.textContent || ''
+    const matched = rawText.match(/localStorageKey:\s*['"]([^'"]+)['"]/)
+    const localStorageKey = matched?.[1]
+    if (!localStorageKey) return null
+
+    const answers = {}
+    doc.querySelectorAll('input.blank').forEach((input) => {
+      if (input.name) answers[input.name] = input.value
+    })
+
+    return {
+      localStorageKey,
+      data: {
+        answers: { text: answers },
+        timerSecs: latestResult.value?.durationSecs || 0,
+        settings: {
+          fontSize: doc.documentElement.className || 'font-regular',
+          darkMode: doc.body.classList.contains('dark-mode'),
+        },
+      },
+    }
+  } catch (error) {
+    console.warn('Failed to capture listening review payload:', error)
+    return null
+  }
+}
 
 // 保存练习记录到全局历史
 const saveToHistory = (data) => {
@@ -89,6 +126,9 @@ const saveToHistory = (data) => {
           path: encodedPath,
           title: sourceTitle,
         },
+      },
+      answers: {
+        listeningRestore: captureListeningReviewPayload(),
       },
     })
 
@@ -220,7 +260,44 @@ const onIframeLoad = () => {
         }
 
         // 统计当前正确数 (兼容单选、多选拆分为独立计分)
+        window.getConfiguredQuestionTotal = function() {
+          const script = document.getElementById('task-configuration');
+          if (!script) return 0;
+          try {
+            const text = script.textContent || '';
+            const newText = text.replace('const CONFIG_DATA =', 'window.__CONFIG_DATA__ =');
+            const scriptEl = document.createElement('script');
+            scriptEl.textContent = newText;
+            document.body.appendChild(scriptEl);
+
+            const config = window.__CONFIG_DATA__;
+            if (Array.isArray(config?.questionList) && config.questionList.length > 0) {
+              return config.questionList.length;
+            }
+          } catch (e) {
+            console.error("Failed to parse CONFIG_DATA for question total:", e);
+          }
+          return 0;
+        };
+
         window.calculateScore = function() {
+          const resultRows = document.querySelectorAll('.results-table tbody tr');
+          if (resultRows.length > 0) {
+            let score = 0;
+            resultRows.forEach((row) => {
+              const statusCell = row.cells[row.cells.length - 1];
+              if (!statusCell) return;
+              if (statusCell.classList.contains('result-correct')) {
+                score += 1;
+                return;
+              }
+              if (/correct/i.test(statusCell.textContent || '') && !/incorrect/i.test(statusCell.textContent || '')) {
+                score += 1;
+              }
+            });
+            return { score, total: resultRows.length };
+          }
+
           const script = document.getElementById('task-configuration');
           if (script) {
             try {
@@ -243,6 +320,25 @@ const onIframeLoad = () => {
                     total += 1;
                     const radio = document.querySelector('input[name="' + qKey + '"]:checked');
                     if (radio && radio.value === correctAns) {
+                      score += 1;
+                    }
+                  }
+                }
+
+                // 1.5 统计文本题 / 普通填空题
+                if (config.answerKey && config.answerKey.text) {
+                  const norm = (value) => String(value ?? '').trim().toLowerCase();
+                  for (const [qKey, correctAns] of Object.entries(config.answerKey.text)) {
+                    total += 1;
+                    const input = document.querySelector('input[name="' + qKey + '"]');
+                    const userAns = input ? input.value : '';
+
+                    if (Array.isArray(correctAns)) {
+                      const matched = correctAns.some((answer) => norm(answer) === norm(userAns));
+                      if (matched) {
+                        score += 1;
+                      }
+                    } else if (norm(correctAns) === norm(userAns)) {
                       score += 1;
                     }
                   }
@@ -281,7 +377,8 @@ const onIframeLoad = () => {
             return { score, total: navItems.length };
           }
           
-          return { score: 0, total: 0 };
+          const configuredTotal = window.getConfiguredQuestionTotal();
+          return { score: 0, total: configuredTotal };
         };
 
         // 通知到父窗体
@@ -310,12 +407,36 @@ const onIframeLoad = () => {
           if (!isInitial) showToast('✅ 练习记录已同步更新');
         };
 
+        window.waitAndNotifyParent = function() {
+          let attempt = 0;
+          const maxAttempts = 12;
+
+          const tryNotify = function() {
+            const result = window.calculateScore();
+            const hasResolvedResult = result.total > 0 && (
+              result.score > 0
+              || document.querySelector('.results-table')
+              || document.querySelector('.q-nav-item.correct, .q-nav-item.incorrect')
+            );
+
+            if (hasResolvedResult || attempt >= maxAttempts) {
+              window.notifyParent(true);
+              return;
+            }
+
+            attempt += 1;
+            setTimeout(tryNotify, 250);
+          };
+
+          tryNotify();
+        };
+
         // 监听“完成”按钮点击
         document.addEventListener('click', function(e) {
           if (e.target.closest('#finish-btn')) {
             setTimeout(() => {
-              window.notifyParent(true);
-            }, 600);
+              window.waitAndNotifyParent();
+            }, 250);
           }
         });
 
@@ -355,6 +476,12 @@ const onIframeLoad = () => {
               const wasCorrect = input.classList.contains('input-correct');
               input.classList.toggle('input-correct', !wasCorrect);
               input.classList.toggle('input-incorrect', wasCorrect);
+
+              const navItem = document.querySelector('.q-nav-item[data-qnum="' + qNum + '"]');
+              if (navItem) {
+                navItem.classList.remove('answered', 'correct', 'incorrect');
+                navItem.classList.add(!wasCorrect ? 'correct' : 'incorrect');
+              }
               
               const statusCell = row.cells[row.cells.length - 1];
               if (statusCell) {
@@ -373,8 +500,8 @@ const onIframeLoad = () => {
           .results-table tr { cursor: pointer !important; user-select: none; }
           .results-table tr:hover { background: rgba(124, 58, 237, 0.08) !important; }
           .results-table::after {
-            content: '💡 提示：点击表格行可手动切换对错，统计数据将实时同步更新。';
-            display: block; margin: 15px 0; color: #7c3aed; font-weight: 600; font-size: 14.5px;
+            content: '提示：点击表格行可手动切换对错，分数会同步更新。';
+            display: block; margin: 12px 0; color: #64748b; font-weight: 600; font-size: 13px; white-space: nowrap;
           }
         \`;
         document.head.appendChild(style);
@@ -383,6 +510,17 @@ const onIframeLoad = () => {
       })();
     `;
     doc.body.appendChild(script)
+
+    if (shouldOpenReview) {
+      const originalConfirm = win.confirm
+      win.confirm = () => true
+      setTimeout(() => {
+        doc.getElementById('finish-btn')?.click()
+        setTimeout(() => {
+          win.confirm = originalConfirm
+        }, 600)
+      }, 120)
+    }
   } catch (e) {
     console.warn("Bridge injection failed:", e)
   }

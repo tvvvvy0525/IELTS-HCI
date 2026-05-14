@@ -230,10 +230,29 @@ async function resumePractice(record) {
 }
 
 async function viewExplanation(record) {
-  if (record.answers) {
+  if (record.subject === 'listening' && record.answers?.listeningRestore?.localStorageKey) {
+    try {
+      localStorage.setItem(
+        record.answers.listeningRestore.localStorageKey,
+        JSON.stringify(record.answers.listeningRestore.data || {}),
+      )
+    } catch (error) {
+      console.warn('Failed to seed listening review state:', error)
+    }
+  } else if (record.answers) {
     saveReadingDraftState(record.examId, record.answers)
   }
   const routeObj = await resolveRouteFromRecord(record)
+  if (record.subject === 'listening') {
+    router.push({
+      ...routeObj,
+      query: {
+        ...(routeObj.query || {}),
+        review: 'true',
+      },
+    })
+    return
+  }
   router.push(routeObj)
 }
 

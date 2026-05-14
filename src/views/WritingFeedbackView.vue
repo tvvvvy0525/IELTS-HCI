@@ -51,6 +51,14 @@
             >
               {{ isAutoGrading ? '批改中...' : '开始自动批改' }}
             </button>
+            <button
+              class="ghost-btn"
+              type="button"
+              @click="showManualArea = true"
+              v-if="!showManualArea"
+            >
+              使用外部批改
+            </button>
             <div style="margin: 0 0 0 auto; display: flex; align-items: center; gap: 8px;">
               <span class="hint">切换模型:</span>
               <select 
@@ -97,7 +105,7 @@
           <AiDisclaimer />
         </section>
 
-        <template v-if="aiSettings.provider !== 'ollama' || autoGradeError">
+        <template v-if="aiSettings.provider !== 'ollama' || autoGradeError || showManualArea">
           <section class="card">
           <div class="section-header">
             <h3>手动评分</h3>
@@ -146,32 +154,40 @@
               <span class="score-value">{{ feedback.bandOverall || '-' }}</span>
             </div>
             <div class="score-item">
-              <span class="score-label">TR</span>
+              <button class="score-label explain-btn" type="button" @click="toggleScoreExplain('TR')">TR</button>
               <span class="score-value">{{ feedback.scores.TR || '-' }}</span>
             </div>
             <div class="score-item">
-              <span class="score-label">CC</span>
+              <button class="score-label explain-btn" type="button" @click="toggleScoreExplain('CC')">CC</button>
               <span class="score-value">{{ feedback.scores.CC || '-' }}</span>
             </div>
             <div class="score-item">
-              <span class="score-label">LR</span>
+              <button class="score-label explain-btn" type="button" @click="toggleScoreExplain('LR')">LR</button>
               <span class="score-value">{{ feedback.scores.LR || '-' }}</span>
             </div>
             <div class="score-item">
-              <span class="score-label">GRA</span>
+              <button class="score-label explain-btn" type="button" @click="toggleScoreExplain('GRA')">GRA</button>
               <span class="score-value">{{ feedback.scores.GRA || '-' }}</span>
             </div>
           </div>
+          <div v-if="activeScoreExplain" class="score-explain-card">
+            <div class="score-explain-header">
+              <strong>{{ activeScoreExplain.key }}</strong>
+              <button class="ghost-btn" type="button" @click="activeScoreExplainKey = ''" style="padding: 4px 8px; font-size: 12px;">关闭</button>
+            </div>
+            <div class="score-explain-title">{{ activeScoreExplain.title }}</div>
+            <p class="score-explain-text">{{ activeScoreExplain.text }}</p>
+          </div>
           <div class="markdown-body" v-if="feedback.commentsMd" style="margin-bottom: 24px; padding: 16px; background: var(--surface-hover); border-radius: 8px;">
             <div style="font-weight: 700; margin-bottom: 8px;">综合评语</div>
-            <div class="md-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);" v-html="renderedCommentsMd"></div>
+            <div class="md-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);" v-html="renderedCommentsMd" @mousemove="handleMouseMove" @mouseleave="handleMouseLeave"></div>
             <AiDisclaimer v-if="feedback.source === 'ai'" />
           </div>
 
           <div class="deep-review-container">
             <div class="review-left">
               <div class="label">原文</div>
-              <div class="original-essay-content" v-html="highlightedOriginalEssay"></div>
+              <div class="original-essay-content" v-html="highlightedOriginalEssay" @mousemove="handleMouseMove" @mouseleave="handleMouseLeave"></div>
             </div>
 
             <div class="review-right">
@@ -207,31 +223,52 @@
             </div>
           </div>
 
-          <div class="actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light); display: flex; align-items: center; gap: 12px;">
-            <button class="primary-btn" type="button" @click="doGenerateSampleEssay" :disabled="!practice || isGeneratingSample || !feedback.bandOverall">
-              {{ isGeneratingSample ? '正在生成范文...' : '生成范文' }}
-            </button>
-            <span class="hint" style="line-height: 38px;" v-if="sampleEssayMessage" :class="{'error-text': sampleEssayError}">
-              {{ sampleEssayMessage }}
-            </span>
-            
-            <div style="margin: 0 0 0 auto; display: flex; align-items: center; gap: 8px;">
-              <span class="hint" style="font-size: 12px;">切换模型:</span>
-              <select 
-                v-model="aiSettings.ollamaModelSample" 
-                class="input" 
-                style="padding: 4px 8px; font-size: 12px; width: 140px;"
-                @change="saveModelChange"
-              >
-                <option v-for="model in ollamaModels" :key="model" :value="model">{{ model }}</option>
-                <option v-if="ollamaModels.length === 0" value="llama3">llama3</option>
-                <option v-if="ollamaModels.length === 0" value="qwen">qwen</option>
-              </select>
+          <div class="actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 16px;">
+            <!-- Ollama 模式下的生成按钮 -->
+            <div v-if="aiSettings.provider === 'ollama' && !showManualArea" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <button class="primary-btn" type="button" @click="doGenerateSampleEssay" :disabled="!practice || isGeneratingSample || !feedback.bandOverall">
+                {{ isGeneratingSample ? '正在生成范文...' : '生成范文' }}
+              </button>
+              <span class="hint" style="line-height: 38px;" v-if="sampleEssayMessage" :class="{'error-text': sampleEssayError}">
+                {{ sampleEssayMessage }}
+              </span>
               
-              <span v-if="ollamaConnected" style="color: #52c41a; font-size: 12px; font-weight: 600;">正常连接</span>
-              <div v-else style="display: flex; align-items: center; gap: 4px;">
-                <span style="color: #ef4444; font-size: 12px; font-weight: 600;">无法连接</span>
-                <button class="ghost-btn-small" style="font-size: 12px; padding: 2px 6px;" @click="showOllamaFixModal = true">修复</button>
+              <div style="margin: 0 0 0 auto; display: flex; align-items: center; gap: 8px;">
+                <span class="hint" style="font-size: 12px;">切换模型:</span>
+                <select 
+                  v-model="aiSettings.ollamaModelSample" 
+                  class="input" 
+                  style="padding: 4px 8px; font-size: 12px; width: 140px;"
+                  @change="saveModelChange"
+                >
+                  <option v-for="model in ollamaModels" :key="model" :value="model">{{ model }}</option>
+                  <option v-if="ollamaModels.length === 0" value="llama3">llama3</option>
+                  <option v-if="ollamaModels.length === 0" value="qwen">qwen</option>
+                </select>
+                
+                <!-- 连接状态放回这里 -->
+                <span v-if="ollamaConnected" style="color: #52c41a; font-size: 12px; font-weight: 600;">正常连接</span>
+                <div v-else style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #ef4444; font-size: 12px; font-weight: 600;">无法连接</span>
+                  <button class="ghost-btn-small" style="font-size: 12px; padding: 2px 6px;" @click="showOllamaFixModal = true">修复</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 手动模式下的复制和粘贴 -->
+            <div v-else style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="ghost-btn" type="button" @click="copySamplePrompt">复制范文提示词</button>
+                <span class="hint">可将提示词发送给外部 AI（如 ChatGPT/Claude）</span>
+              </div>
+              <textarea 
+                v-model="sampleEssayInput" 
+                class="textarea" 
+                placeholder="将网页版 AI 返回的范文粘贴到这里..." 
+                style="min-height: 120px;"
+              />
+              <div style="display: flex; justify-content: flex-end;">
+                <button class="primary-btn" type="button" @click="saveSampleEssay" :disabled="!sampleEssayInput">保存范文</button>
               </div>
             </div>
           </div>
@@ -243,7 +280,7 @@
               <div style="margin-top: 8px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 6px; white-space: pre-wrap; font-family: monospace;">{{ feedback.sampleEssayThinking }}</div>
             </details>
             <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);">
-              <div class="md-content" v-if="feedback.sampleEssay" v-html="renderedSampleEssay" @mouseover="handleMarkdownMouseOver" @mouseout="handleMarkdownMouseOut"></div>
+              <div class="md-content" v-if="feedback.sampleEssay" v-html="renderedSampleEssay" @mouseover="handleMarkdownMouseOver" @mouseout="handleMarkdownMouseOut" @mousemove="handleMouseMove" @mouseleave="handleMouseLeave"></div>
               <template v-else-if="isGeneratingSample && !feedback.sampleEssayThinking"><span style="color: var(--text-muted); font-style: italic;">等待模型连接...</span></template>
             </div>
             <AiDisclaimer v-if="feedback.sampleEssay || feedback.sampleEssayThinking || isGeneratingSample" />
@@ -255,7 +292,7 @@
           <h3>参考范文 (范文库)</h3>
           <div class="markdown-body" style="padding: 16px; background: var(--surface-hover); border-radius: 8px;">
             <div style="font-weight: 700; margin-bottom: 8px;">{{ currentExemplar.title }}</div>
-            <div style="white-space: pre-wrap; font-family: inherit; margin-bottom: 16px; color: var(--text-secondary);">
+            <div style="white-space: pre-wrap; font-family: inherit; margin-bottom: 16px; color: var(--text-secondary);" @mousemove="handleMouseMove" @mouseleave="handleMouseLeave">
               {{ currentExemplar.sample }}
             </div>
             <div style="border-top: 1px solid var(--border-light); margin-bottom: 16px;"></div>
@@ -344,6 +381,40 @@
         </div>
       </div>
     </div>
+
+    <!-- 悬停取词加入生词本气泡 -->
+    <div 
+      v-if="showWordPopover" 
+      :style="popoverStyle" 
+      class="word-selector-popover"
+      style="max-width: 300px; font-family: inherit;"
+      @mouseenter="isMousingOverPopover = true"
+      @mouseleave="isMousingOverPopover = false; clearHoverState()"
+    >
+      <!-- 单词与词性 -->
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; border-bottom: 1px solid #475569; padding-bottom: 4px; gap: 12px;">
+        <strong style="font-size: 1.1rem; color: #f8fafc;">{{ selectedWord }}</strong>
+        <span v-if="aiWordInfo.pos" style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">{{ aiWordInfo.pos }}</span>
+      </div>
+      
+      <!-- 释义 -->
+      <p style="margin: 6px 0; font-size: 0.9rem; color: #cbd5e1; line-height: 1.4;">
+        {{ aiWordInfo.meaning }}
+      </p>
+      
+      <!-- 操作按钮 -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+        <button 
+          class="popover-btn" 
+          @click="addSelectedWordToNotebook"
+          :disabled="isAiLoading"
+          style="padding: 3px 8px; font-size: 0.8rem; background: #38bdf8; color: #0f172a; border-radius: 4px; font-weight: 600; cursor: pointer;"
+          :style="{ opacity: isAiLoading ? 0.6 : 1, cursor: isAiLoading ? 'not-allowed' : 'pointer' }"
+        >
+          <span style="margin-right: 2px;">+</span>加入生词本
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -353,6 +424,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import AiDisclaimer from '../components/AiDisclaimer.vue'
 import NextActionPanel from '../components/NextActionPanel.vue'
+import { isMockMode, getNextMockRoute } from '../utils/mockTestFlow.js'
 import { task1Exemplars } from '../utils/writingExemplars.js'
 import { EXAM_HISTORY_UPDATED_EVENT, saveExamRecord } from '../utils/examHistory.js'
 import { vocabularyStore } from '../utils/vocabularyStore.js'
@@ -373,7 +445,7 @@ import {
   upsertFeedbackById,
 } from '../utils/writingFeedback.js'
 import { getAiSettings, setAiSettings, AI_SETTINGS_UPDATED_EVENT } from '../utils/writingAiSettings.js'
-import { autoGradeWriting, autoGenerateSampleEssay } from '../utils/writingAiClient.js'
+import { autoGradeWriting, autoGenerateSampleEssay, explainWordInContext } from '../utils/writingAiClient.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -393,12 +465,193 @@ const isGeneratingSample = ref(false)
 const sampleEssayMessage = ref('')
 const sampleEssayError = ref(false)
 
+// 悬停取词加入生词本状态
+const showWordPopover = ref(false)
+const popoverStyle = ref({ top: '0px', left: '0px' })
+const selectedWord = ref('')
+let hoverTimer = null
+let hideTimer = null
+const currentHoverWord = ref('')
+const isMousingOverPopover = ref(false)
+const aiWordInfo = ref({ pos: '', meaning: '', example: '' })
+const isAiLoading = ref(false)
+
+function handleMouseMove(e) {
+  if (isMousingOverPopover.value) return
+  
+  const result = extractWordAtPoint(e)
+  
+  if (result) {
+    clearTimeout(hideTimer)
+    const { word, range, sentence } = result
+    
+    if (word !== currentHoverWord.value) {
+      currentHoverWord.value = word
+      applyHighlight(range)
+      
+      clearTimeout(hoverTimer)
+      showWordPopover.value = false
+      
+      hoverTimer = setTimeout(async () => {
+        selectedWord.value = word
+        showPopoverAtRange(range)
+        
+        // 触发 AI 查词
+        isAiLoading.value = true
+        aiWordInfo.value = { pos: '', meaning: '正在通过 AI 解析语境释义...', example: '' }
+        try {
+          const info = await explainWordInContext(word, sentence)
+          aiWordInfo.value = info
+        } catch (err) {
+          aiWordInfo.value = { pos: '-', meaning: '解析失败: ' + err.message, example: '' }
+        } finally {
+          isAiLoading.value = false
+        }
+      }, 1000)
+    }
+  } else {
+    clearTimeout(hoverTimer)
+    
+    if (showWordPopover.value) {
+      clearTimeout(hideTimer)
+      hideTimer = setTimeout(() => {
+        if (!isMousingOverPopover.value) {
+          clearHoverState()
+        }
+      }, 300)
+    } else {
+      clearHoverState()
+    }
+  }
+}
+
+function handleMouseLeave() {
+  clearTimeout(hoverTimer)
+  if (showWordPopover.value) {
+    clearTimeout(hideTimer)
+    hideTimer = setTimeout(() => {
+      if (!isMousingOverPopover.value) {
+        clearHoverState()
+      }
+    }, 300)
+  } else {
+    clearHoverState()
+  }
+}
+
+function extractWordAtPoint(e) {
+  let range
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(e.clientX, e.clientY)
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY)
+    if (pos) {
+      range = document.createRange()
+      range.setStart(pos.offsetNode, pos.offset)
+      range.setEnd(pos.offsetNode, pos.offset)
+    }
+  }
+  
+  if (range && range.startContainer.nodeType === Node.TEXT_NODE) {
+    const textNode = range.startContainer
+    const offset = range.startOffset
+    const text = textNode.textContent
+    
+    let start = offset
+    while (start > 0 && /[a-zA-Z]/.test(text[start - 1])) {
+      start--
+    }
+    
+    let end = offset
+    while (end < text.length && /[a-zA-Z]/.test(text[end])) {
+      end++
+    }
+    
+    const word = text.slice(start, end).trim()
+    
+    if (word.length >= 2 && /^[a-zA-Z]+$/.test(word)) {
+      const wordRange = document.createRange()
+      wordRange.setStart(textNode, start)
+      wordRange.setEnd(textNode, end)
+      
+      // 提取句子
+      let sentenceStart = offset
+      while (sentenceStart > 0 && !/[.!?\n]/.test(text[sentenceStart - 1])) {
+        sentenceStart--
+      }
+      
+      let sentenceEnd = offset
+      while (sentenceEnd < text.length && !/[.!?\n]/.test(text[sentenceEnd])) {
+        sentenceEnd++
+      }
+      
+      const sentence = text.slice(sentenceStart, sentenceEnd).trim()
+      
+      return { word, range: wordRange, sentence }
+    }
+  }
+  return null
+}
+
+function applyHighlight(range) {
+  if (typeof CSS !== 'undefined' && CSS.highlights) {
+    const highlight = new Highlight(range)
+    CSS.highlights.set('word-hover', highlight)
+  }
+}
+
+function clearHoverState() {
+  currentHoverWord.value = ''
+  clearTimeout(hoverTimer)
+  showWordPopover.value = false
+  if (typeof CSS !== 'undefined' && CSS.highlights) {
+    CSS.highlights.delete('word-hover')
+  }
+}
+
+function showPopoverAtRange(range) {
+  const rect = range.getBoundingClientRect()
+  showWordPopover.value = true
+  popoverStyle.value = {
+    top: `${rect.top + window.scrollY - 36}px`,
+    left: `${rect.left + window.scrollX + rect.width / 2}px`,
+    transform: 'translateX(-50%)',
+    position: 'absolute',
+    zIndex: 10000
+  }
+}
+
+function addSelectedWordToNotebook() {
+  if (!selectedWord.value) return
+  
+  const cleanedWord = selectedWord.value.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '')
+  
+  if (!cleanedWord) {
+    alert('未选中有意义的单词！')
+    return
+  }
+  
+  vocabularyStore.addCustomWord({
+    word: cleanedWord,
+    pos: aiWordInfo.value.pos || 'n.',
+    meaning: aiWordInfo.value.meaning || '划词添加',
+    example: aiWordInfo.value.example || '',
+    topic: '写作反馈'
+  })
+  
+  alert(`已将 "${cleanedWord}" 加入生词本！`)
+  showWordPopover.value = false
+  window.getSelection().removeAllRanges()
+}
+
 const practices = ref(getPractices())
 const feedbackList = ref(getFeedbackList())
 const selectedPracticeId = ref('')
 const feedback = ref(createFeedback(''))
 const jsonInput = ref('')
 const parseMessage = ref('')
+const showManualArea = ref(false)
+const sampleEssayInput = ref('')
 const showModeUpgradeModal = ref(false)
 const hasCheckedModeUpgrade = ref(false)
 const vocabState = vocabularyStore.state
@@ -428,7 +681,7 @@ const nextActions = computed(() => {
     {
       label: '进入下一科',
       variant: 'ghost',
-      to: '/exam/dashboard',
+      to: isMockMode() ? getNextMockRoute() : '/exam/speaking',
     },
   ]
 })
@@ -457,6 +710,34 @@ const renderedSampleEssay = computed(() => {
 })
 
 const hoveredFeedbackText = ref(null)
+const activeScoreExplainKey = ref('')
+const scoreExplainMap = {
+  TR: {
+    key: 'TR',
+    title: 'Task Response',
+    text: '看你是否真正回答了题目要求，观点是否完整展开，论证是否充分。',
+  },
+  CC: {
+    key: 'CC',
+    title: 'Coherence and Cohesion',
+    text: '看文章结构是否清楚，段落衔接是否自然，连接词和逻辑是否顺畅。',
+  },
+  LR: {
+    key: 'LR',
+    title: 'Lexical Resource',
+    text: '看词汇量和用词质量，包括词语是否准确、丰富、自然，是否会重复。',
+  },
+  GRA: {
+    key: 'GRA',
+    title: 'Grammatical Range and Accuracy',
+    text: '看语法是否准确，以及句型是否有变化，不只是简单句。',
+  },
+}
+const activeScoreExplain = computed(() => scoreExplainMap[activeScoreExplainKey.value] || null)
+
+function toggleScoreExplain(key) {
+  activeScoreExplainKey.value = activeScoreExplainKey.value === key ? '' : key
+}
 
 const originalEssayText = computed(() => {
   return practice.value ? buildPracticeContent(practice.value) : ''
@@ -761,6 +1042,37 @@ async function doGenerateSampleEssay() {
   }
 }
 
+function copySamplePrompt() {
+  if (!practice.value) {
+    alert('请先选择练笔记录')
+    return
+  }
+  const prompt = `你是一名专业的雅思写作专家。
+请根据以下题目和我的作答，为我写一篇 8 分标准的范文。
+
+【题目】
+${practice.value.prompt}
+
+【我的作答】
+${practice.value.content || '（未提供作答）'}
+
+请直接输出范文内容，支持 Markdown 格式。`
+
+  copyText(prompt)
+  alert('范文提示词已复制！')
+}
+
+function saveSampleEssay() {
+  if (!sampleEssayInput.value) {
+    alert('请先粘贴范文内容')
+    return
+  }
+  feedback.value.sampleEssay = sampleEssayInput.value
+  feedback.value.updatedAt = new Date().toISOString()
+  saveFeedback('manual')
+  alert('范文保存成功！')
+}
+
 async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(text)
@@ -915,6 +1227,53 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+::highlight(word-hover) {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
+.word-selector-popover {
+  position: absolute;
+  background: #1e293b;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  z-index: 10000;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.word-selector-popover::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0;
+  border-style: solid;
+  border-color: #1e293b transparent;
+  display: block;
+  width: 0;
+}
+
+.word-selector-popover .popover-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.word-selector-popover .popover-btn:hover {
+  color: #60a5fa; /* 使用亮蓝色作为 hover 效果 */
+}
+
 .writing-page {
   display: flex;
   flex-direction: column;
@@ -1014,6 +1373,8 @@ onUnmounted(() => {
   background: var(--surface-hover);
   padding: 16px;
   border-radius: 8px;
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .original-essay-content {
@@ -1263,6 +1624,45 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--text-muted);
   font-weight: 600;
+}
+
+.explain-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.score-explain-card {
+  margin: -6px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--surface-hover);
+}
+
+.score-explain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.score-explain-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.score-explain-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .score-value {

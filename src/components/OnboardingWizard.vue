@@ -3,12 +3,12 @@
     <div class="wizard-card card">
       <div class="wizard-header">
         <p class="eyebrow">新手引导</p>
-        <h3>{{ step === 4 ? '恭喜完成配置' : '开始前 3 步配置' }}</h3>
-        <p class="wizard-sub">{{ step === 4 ? '现在你可以选择从任意项目开始，也可以稍后再开始。' : '完成后可直接进入今日学习任务。' }}</p>
+        <h3>{{ step === 5 ? '恭喜完成配置' : '开始前 4 步配置' }}</h3>
+        <p class="wizard-sub">{{ step === 5 ? '现在你可以选择从任意项目开始，也可以稍后再开始。' : '完成后可直接进入今日学习任务。' }}</p>
       </div>
 
       <div class="wizard-steps">
-        <span v-for="n in 4" :key="n" class="step-dot" :class="{ active: n === step, done: n < step }">{{ n }}</span>
+        <span v-for="n in 5" :key="n" class="step-dot" :class="{ active: n === step, done: n < step }">{{ n }}</span>
       </div>
 
       <section v-if="step === 1" class="wizard-section">
@@ -36,8 +36,8 @@
       </section>
 
       <section v-else-if="step === 2" class="wizard-section">
-        <h4>语音权限与 ASR</h4>
-        <p class="hint">推荐使用“自动”：系统会先尝试你配置的语音服务；如果不可用，会自动改用浏览器语音输入，不会中断练习。</p>
+        <h4>语音权限与 ASR（自动语音识别）</h4>
+        <p class="hint">ASR 用于将您的声音实时转换为文字。推荐使用“自动”：系统会先尝试你配置的语音服务；如果不可用，会自动改用浏览器语音输入，不会中断练习。</p>
         <label class="setting-item">
           <span>ASR 策略</span>
           <select v-model="asrSettings.asrMode" class="input">
@@ -64,11 +64,28 @@
         <p class="hint">如果选择“仅本地 ASR 服务”，需要你先在电脑上手动启动本地 ASR 程序（例如：`python scripts/asr_server.py`）。</p>
         <div class="actions-row">
           <button class="primary-btn" type="button" @click="requestMicPermission">检测麦克风权限</button>
-          <span class="status" :class="micStatus.type">{{ micStatus.text }}</span>
+          <span class="status" :class="micStatus.type">
+            {{ micStatus.text }}
+            <button v-if="micStatus.text.includes('拒绝')" class="ghost-btn-small" style="margin-left: 8px; border-color: var(--warning); color: var(--warning); padding: 1px 6px; font-size: 11px;" @click="showMicFixModal = true">去修复</button>
+          </span>
         </div>
       </section>
 
       <section v-else-if="step === 3" class="wizard-section">
+        <h4>词汇复习方式</h4>
+        <p class="hint">如果你的备考时间在两个月及以上，系统会优先推荐艾宾浩斯背词；如果时间更短，则优先推荐迅速刷词。你也可以手动固定模式。</p>
+        <label class="setting-item">
+          <span>词汇复习模式</span>
+          <select v-model="vocabularySettings.reviewMode" class="input">
+            <option value="auto">自动推荐</option>
+            <option value="ebbinghaus">艾宾浩斯背词</option>
+            <option value="quick">迅速刷词</option>
+          </select>
+        </label>
+        <p class="hint">{{ vocabularyModeHint }}</p>
+      </section>
+
+      <section v-else-if="step === 4" class="wizard-section">
         <h4>AI 批改模式</h4>
         <label class="setting-item">
           <span>批改模式</span>
@@ -84,6 +101,30 @@
             <button class="primary-btn" type="button" @click="testOllama" :disabled="checkingOllama">{{ checkingOllama ? '测试中...' : '测试连接' }}</button>
           </div>
           <span v-if="ollamaStatus" class="status" :class="ollamaStatusType">{{ ollamaStatus }}</span>
+          <span class="hint">模型名可以直接填写；测试连接只是帮你校验地址并尝试读取本地模型列表。</span>
+        </div>
+        <div v-if="aiSettings.provider === 'ollama'" class="ollama-model-grid">
+          <label class="setting-item">
+            <span>批改模型</span>
+            <select v-if="availableModels.length > 0" v-model="aiSettings.ollamaModel" class="input">
+              <option v-for="m in availableModels" :key="`fb-${m.name}`" :value="m.name">{{ m.name }}</option>
+            </select>
+            <input v-else v-model="aiSettings.ollamaModel" class="input" placeholder="llama3" />
+          </label>
+          <label class="setting-item">
+            <span>范文模型</span>
+            <select v-if="availableModels.length > 0" v-model="aiSettings.ollamaModelSample" class="input">
+              <option v-for="m in availableModels" :key="`sample-${m.name}`" :value="m.name">{{ m.name }}</option>
+            </select>
+            <input v-else v-model="aiSettings.ollamaModelSample" class="input" placeholder="llama3" />
+          </label>
+          <label class="setting-item">
+            <span>口语模型</span>
+            <select v-if="availableModels.length > 0" v-model="aiSettings.ollamaModelSpeaking" class="input">
+              <option v-for="m in availableModels" :key="`speaking-${m.name}`" :value="m.name">{{ m.name }}</option>
+            </select>
+            <input v-else v-model="aiSettings.ollamaModelSpeaking" class="input" placeholder="llama3" />
+          </label>
         </div>
       </section>
 
@@ -104,22 +145,102 @@
         <button class="ghost-btn" type="button" @click="prevStep" :disabled="step === 1">上一步</button>
         <div class="right-actions">
           <button class="ghost-btn" type="button" @click="skipWizard">{{ step === 4 ? '跳过，稍后开始' : '稍后配置' }}</button>
-          <button v-if="step < 4" class="primary-btn" type="button" @click="nextStep">{{ step === 3 ? '完成配置' : '下一步' }}</button>
+          <button v-if="step < 5" class="primary-btn" type="button" @click="nextStep">下一步</button>
         </div>
       </div>
+    <!-- 麦克风权限修复弹窗 -->
+    <div v-if="showMicFixModal" class="wizard-backdrop" @click="showMicFixModal = false" style="z-index: 3000;">
+      <div class="wizard-card" @click.stop style="max-width: 750px; width: 92vw;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+          <h3 style="margin: 0; color: var(--accent);">如何恢复麦克风权限？</h3>
+          <button style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);" @click="showMicFixModal = false">&times;</button>
+        </div>
+        
+        <div style="display: flex; gap: 20px; flex-direction: row;" class="responsive-flex">
+          <!-- 左侧：文字说明 -->
+          <div style="flex: 1.2; padding: 10px 0;">
+            <p style="margin-bottom: 15px; color: var(--text-secondary); font-size: 14px;">如果您不小心拒绝了麦克风权限，可以按照以下步骤恢复：</p>
+            
+            <div style="background: var(--surface-hover); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+              <p style="font-weight: 600; margin-bottom: 8px; color: var(--accent); font-size: 14px;">Chrome / Edge 浏览器：</p>
+              <ol style="padding-left: 20px; color: var(--text-secondary); line-height: 1.6; font-size: 13px;">
+                <li>点击浏览器地址栏左侧的 🔒 <strong>锁图标</strong> 或 ⓘ <strong>图标</strong>。</li>
+                <li>找到 <strong>麦克风</strong>（Microphone）选项。</li>
+                <li>将其状态改为 <strong>允许</strong>（Allow）。</li>
+                <li>刷新页面重新开始练习。</li>
+              </ol>
+            </div>
+
+            <div style="background: var(--surface-hover); padding: 15px; border-radius: 8px;">
+              <p style="font-weight: 600; margin-bottom: 8px; color: var(--accent); font-size: 14px;">Safari 浏览器：</p>
+              <ol style="padding-left: 20px; color: var(--text-secondary); line-height: 1.6; font-size: 13px;">
+                <li>点击菜单栏的 <strong>Safari 浏览器</strong> -> <strong>偏好设置</strong>。</li>
+                <li>切换到 <strong>网站</strong> 标签页，点击左侧的 <strong>麦克风</strong>。</li>
+                <li>在右侧找到当前网站，改为 <strong>允许</strong>。</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- 右侧：纯 CSS 动画演示 -->
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; height: 320px; overflow: hidden; position: relative;" class="animation-container">
+            <!-- 模拟浏览器外壳 -->
+            <div class="browser-mockup">
+              <!-- 地址栏 -->
+              <div class="mock-address-bar">
+                <div class="mock-lock-icon">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="mock-url">localhost:5173</div>
+              </div>
+              
+              <!-- 模拟下拉菜单 -->
+              <div class="mock-dropdown">
+                <div class="mock-dropdown-header">网站设置</div>
+                <div class="mock-dropdown-item item-mic">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v10m0 0a3 3 0 0 1-3-3V4a3 3 0 0 1 6 0v4a3 3 0 0 1-3 3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 21v2m-4 0h8"></path></svg>
+                    <span>麦克风</span>
+                  </div>
+                  <div class="mock-switch"></div>
+                </div>
+                <div class="mock-dropdown-item" style="opacity: 0.5;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>摄像头</span>
+                  </div>
+                  <div class="mock-switch" style="background: #ccc;"></div>
+                </div>
+              </div>
+              
+              <!-- 模拟光标 -->
+              <div class="mock-cursor">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="#333" stroke="white" stroke-width="1.5" stroke-linejoin="round"><path d="M5.5 2v17l4.5-4.5 3.5 8 2.5-1 3.5-8.5h-7z"></path></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 15px; border-top: 1px solid var(--border-color); margin-top: 15px;">
+          <button class="primary-btn" @click="showMicFixModal = false">我知道了</button>
+        </div>
+      </div>
+    </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { getAiSettings, setAiSettings } from '../utils/writingAiSettings.js'
-import { pingOllama } from '../utils/writingAiOllama.js'
+
+const showMicFixModal = ref(false)
+import { listOllamaModels, pingOllama } from '../utils/writingAiOllama.js'
 import { getSpeakingSettings, setSpeakingSettings } from '../utils/speakingSettings.js'
 import { pingLocalAsr } from '../utils/speakingAsrProviders.js'
 import { getUserGoals, setUserGoals } from '../utils/userGoals.js'
 import { completeOnboarding, setOnboardingState } from '../utils/onboardingState.js'
 import { vocabularyStore } from '../utils/vocabularyStore.js'
+import { getEffectiveVocabularyMode, getVocabularySettings, setVocabularySettings } from '../utils/vocabularySettings.js'
 
 const emit = defineEmits(['done'])
 
@@ -127,15 +248,18 @@ const step = ref(1)
 const goals = ref(getUserGoals())
 const aiSettings = ref(getAiSettings())
 const asrSettings = ref(getSpeakingSettings())
+const vocabularySettings = ref(getVocabularySettings())
 const goalDateInput = ref(null)
 
 const micStatus = ref({ text: '未检测', type: '' })
 const ollamaStatus = ref('')
 const ollamaStatusType = ref('')
 const checkingOllama = ref(false)
+const availableModels = ref([])
 const localAsrStatus = ref('')
 const localAsrStatusType = ref('')
 const checkingLocalAsr = ref(false)
+let ollamaAutoLoadTimer = null
 
 function persistCurrentStep() {
   setOnboardingState({ lastStep: step.value })
@@ -148,19 +272,18 @@ function prevStep() {
 }
 
 function nextStep() {
-  if (step.value < 3) {
+  if (step.value < 5) {
+    if (step.value === 4) {
+      persistConfig()
+    }
     step.value += 1
     persistCurrentStep()
     return
   }
-
-  persistConfig()
-  step.value = 4
-  persistCurrentStep()
 }
 
 function skipWizard() {
-  if (step.value < 4) {
+  if (step.value < 5) {
     persistConfig()
   }
   completeOnboarding()
@@ -174,9 +297,25 @@ function persistGoals() {
 
 function persistConfig() {
   persistGoals()
+  setVocabularySettings({ ...vocabularySettings.value })
   setSpeakingSettings({ ...asrSettings.value })
   setAiSettings({ ...aiSettings.value })
 }
+
+const vocabularyModeHint = computed(() => {
+  const effectiveMode = getEffectiveVocabularyMode({
+    examDate: goals.value.examDate,
+    reviewMode: vocabularySettings.value.reviewMode,
+  })
+  if (vocabularySettings.value.reviewMode !== 'auto') {
+    return effectiveMode === 'ebbinghaus'
+      ? '当前已手动固定为艾宾浩斯背词。'
+      : '当前已手动固定为迅速刷词。'
+  }
+  return effectiveMode === 'ebbinghaus'
+    ? '按当前考试日期，系统会优先使用艾宾浩斯背词。'
+    : '按当前考试日期，系统会优先使用迅速刷词。'
+})
 
 function finishAndStart(path) {
   persistConfig()
@@ -213,15 +352,34 @@ async function testOllama() {
   try {
     const ok = await pingOllama(aiSettings.value.ollamaBaseUrl)
     if (ok) {
-      ollamaStatus.value = '连接成功，可使用 Ollama 自动批改'
+      availableModels.value = await listOllamaModels(aiSettings.value.ollamaBaseUrl)
+      ollamaStatus.value = availableModels.value.length
+        ? '连接成功，已读取到本地模型列表。'
+        : '连接成功，但未读取到模型列表，你仍可直接手动填写模型名。'
       ollamaStatusType.value = 'success'
     } else {
       ollamaStatus.value = '连接失败，请检查地址和服务状态'
       ollamaStatusType.value = 'error'
     }
+  } catch (error) {
+    ollamaStatus.value = error.message || '连接失败，请检查地址和服务状态'
+    ollamaStatusType.value = 'error'
   } finally {
     checkingOllama.value = false
   }
+}
+
+function scheduleAutoLoadOllamaModels() {
+  if (ollamaAutoLoadTimer) {
+    clearTimeout(ollamaAutoLoadTimer)
+  }
+
+  if (aiSettings.value.provider !== 'ollama') return
+  if (!aiSettings.value.ollamaBaseUrl?.trim()) return
+
+  ollamaAutoLoadTimer = setTimeout(() => {
+    testOllama()
+  }, 450)
 }
 
 async function testLocalAsr() {
@@ -240,6 +398,16 @@ async function testLocalAsr() {
     checkingLocalAsr.value = false
   }
 }
+
+watch(() => aiSettings.value.provider, (provider) => {
+  if (provider === 'ollama') {
+    scheduleAutoLoadOllamaModels()
+  }
+})
+
+watch(() => aiSettings.value.ollamaBaseUrl, () => {
+  scheduleAutoLoadOllamaModels()
+})
 </script>
 
 <style scoped>
@@ -322,6 +490,12 @@ async function testLocalAsr() {
   align-items: center;
 }
 
+.ollama-model-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .status {
   font-size: 13px;
   font-weight: 600;
@@ -379,5 +553,195 @@ async function testLocalAsr() {
   padding: 8px 10px;
   background: var(--surface);
   color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .ollama-model-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 麦克风权限修复弹窗专用样式 */
+.wizard-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.ghost-btn-small {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ghost-btn-small:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* 纯 CSS 动画演示相关样式 */
+.animation-container {
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+}
+
+.browser-mockup {
+  position: relative;
+  width: 240px;
+  background: var(--surface);
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  padding: 10px;
+  height: 200px;
+  overflow: hidden;
+}
+
+.mock-address-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-hover);
+  border-radius: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 10px;
+}
+
+.mock-lock-icon {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+}
+
+.mock-url {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.mock-dropdown {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  width: 140px;
+  position: absolute;
+  top: 45px;
+  left: 10px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-5px);
+  animation: show-dropdown 4s infinite;
+}
+
+.mock-dropdown-header {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.mock-dropdown-item {
+  font-size: 10px;
+  padding: 6px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text);
+}
+
+.mock-switch {
+  width: 24px;
+  height: 12px;
+  background: #666;
+  border-radius: 6px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.mock-switch::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 50%;
+  top: 1px;
+  left: 1px;
+}
+
+/* 应用动画到开关 */
+.item-mic .mock-switch {
+  animation: toggle-switch 4s infinite;
+}
+.item-mic .mock-switch::after {
+  animation: toggle-knob 4s infinite;
+}
+
+.mock-cursor {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  animation: move-cursor 4s infinite;
+}
+
+/* 关键帧动画定义 */
+@keyframes show-dropdown {
+  0%, 15% { opacity: 0; transform: translateY(-5px); }
+  25%, 85% { opacity: 1; transform: translateY(0); }
+  95%, 100% { opacity: 0; transform: translateY(-5px); }
+}
+
+@keyframes toggle-switch {
+  0%, 45% { background: #666; }
+  55%, 100% { background: var(--accent); }
+}
+
+@keyframes toggle-knob {
+  0%, 45% { left: 1px; }
+  55%, 100% { left: 13px; }
+}
+
+@keyframes move-cursor {
+  /* 初始位置：在地址栏下方 */
+  0% { top: 80px; left: 120px; }
+  /* 移向 ⓘ 图标 */
+  15% { top: 24px; left: 20px; }
+  /* 模拟点击 ⓘ 图标 */
+  20% { top: 24px; left: 20px; transform: scale(0.9); }
+  22% { top: 24px; left: 20px; transform: scale(1); }
+  /* 移向麦克风开关 */
+  40% { top: 75px; left: 130px; }
+  /* 模拟拨动开关 */
+  50% { top: 75px; left: 130px; transform: scale(0.9); }
+  55% { top: 75px; left: 130px; transform: scale(1); }
+  /* 移开 */
+  75%, 100% { top: 150px; left: 180px; }
+}
+
+@media (max-width: 600px) {
+  .responsive-flex {
+    flex-direction: column !important;
+  }
+  .animation-container {
+    height: 240px !important;
+  }
 }
 </style>

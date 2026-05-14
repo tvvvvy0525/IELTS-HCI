@@ -33,6 +33,9 @@ export function getTodayStudyRoute({ records = [], vocabState = null, now = new 
   if (!doneSubjects.has('writing')) {
     return { path: '/exam/writing', label: '写作练习' }
   }
-  return { path: '/exam/history', label: '复盘记录' }
+  if (!doneSubjects.has('speaking')) {
+    return { path: '/exam/speaking', label: '口语练习' }
+  }
+  return { path: '/exam/dashboard', label: '今日任务已完成', isAllDone: true }
 }
 

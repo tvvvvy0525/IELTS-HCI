@@ -10,6 +10,22 @@
           <p class="text-white-muted margin-top-sm">
             根据您的考试日期，智能动态分配每日任务，助您高效攻克雅思词汇。
           </p>
+          <div class="mode-summary">
+            <span class="mode-pill">{{ currentModeLabel }}</span>
+            <span class="mode-text">{{ modeRecommendationText }}</span>
+          </div>
+          <div class="mode-switcher" @click.stop>
+            <button
+              v-for="option in modeOptions"
+              :key="option.value"
+              class="mode-switch-btn"
+              :class="{ active: vocabularySettings.reviewMode === option.value }"
+              type="button"
+              @click="setReviewMode(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
           
           <div class="action-buttons">
             <RouterLink to="/exam/vocabulary/review" class="premium-btn">
@@ -38,8 +54,8 @@
               <circle class="progress-ring-bar" stroke="url(#gradient-accent)" stroke-width="12" stroke-linecap="round" fill="transparent" r="70" cx="80" cy="80" :style="{ strokeDasharray: circleCircumference, strokeDashoffset: strokeDashoffset }"/>
               <defs>
                 <linearGradient id="gradient-accent" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#FF5E62" />
-                  <stop offset="100%" stop-color="#FF9966" />
+                  <stop offset="0%" stop-color="#60a5fa" />
+                  <stop offset="100%" stop-color="#2563eb" />
                 </linearGradient>
               </defs>
             </svg>
@@ -161,16 +177,121 @@
         </div>
       </div>
     </div>
+
+    <!-- 背词足迹日历 -->
+    <div class="stats-section" style="margin-top: 32px;">
+      <div class="section-header">
+        <h2>背词足迹日历</h2>
+      </div>
+      
+      <div class="calendar-layout" style="display: flex; gap: 24px; align-items: flex-start;">
+        <!-- 左侧日历卡片 -->
+        <div class="card calendar-card" style="padding: 20px; background: #ffffff !important; border: 1px solid #e2e8f0; border-radius: 16px; width: 360px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <button class="ghost-btn-small" @click="prevMonth" style="padding: 4px 8px;">&lt;</button>
+            <span style="font-weight: 760;">{{ currentMonth.getFullYear() }}年{{ currentMonth.getMonth() + 1 }}月</span>
+            <button class="ghost-btn-small" @click="nextMonth" style="padding: 4px 8px;">&gt;</button>
+          </div>
+          <div class="calendar-grid">
+            <div class="weekday" v-for="w in ['日','一','二','三','四','五','六']" :key="w">{{ w }}</div>
+            <div 
+              v-for="(d, idx) in daysInMonth" 
+              :key="idx" 
+              class="calendar-day"
+              :class="{ 'has-record': d.hasRecord, 'empty': !d.day, 'selected': d.fullDate === selectedDate }"
+              @click="selectDate(d)"
+            >
+              <span class="day-num" :style="{ color: d.day ? 'var(--text)' : 'transparent' }">{{ d.day }}</span>
+              <span class="dot" v-if="d.hasRecord"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧单词列表 -->
+        <div class="card records-card" style="flex: 1; background: #ffffff !important; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; min-height: 410px; display: flex; flex-direction: column;">
+          <div style="border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 16px; display: flex; gap: 20px;">
+            <div 
+              style="font-size: 1.1rem; font-weight: 800; cursor: pointer; transition: color 0.2s;" 
+              :style="{ color: activeTab === 'records' ? '#0f172a' : '#94a3b8' }"
+              @click="activeTab = 'records'"
+            >
+              {{ selectedDate }} 背词记录
+            </div>
+            <div 
+              style="font-size: 1.1rem; font-weight: 800; cursor: pointer; transition: color 0.2s;" 
+              :style="{ color: activeTab === 'custom' ? '#0f172a' : '#94a3b8' }"
+              @click="activeTab = 'custom'"
+            >
+              我的生词本
+            </div>
+          </div>
+          <div style="flex: 1; overflow-y: auto;">
+            <!-- Tab 1: 背词记录 -->
+            <div v-if="activeTab === 'records'">
+              <div v-if="selectedDateWords.length === 0" style="text-align: center; color: #64748b; padding: 40px 0;">
+                <svg style="width: 48px; height: 48px; color: #cbd5e1; margin-bottom: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="16" rx="2"/>
+                  <path d="M16 2v4M8 2v4M3 10h18"/>
+                </svg>
+                <p>这一天没有背词记录</p>
+              </div>
+              <div v-else style="display: flex; flex-direction: column; gap: 16px;">
+                <div v-for="word in selectedDateWords" :key="word.id" class="word-item" style="padding-bottom: 16px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <strong style="font-size: 1.1rem; color: #0f172a;">{{ word.word[0] }}</strong>
+                    <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">{{ word.pos }}</span>
+                  </div>
+                  <p style="margin-top: 4px; color: #475569; font-size: 0.95rem;">{{ word.meaning }}</p>
+                  <p v-if="word.example" style="margin-top: 6px; color: #64748b; font-size: 0.85rem; font-style: italic; background: #f8fafc; padding: 6px; border-radius: 4px;">"{{ word.example }}"</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 2: 我的生词本 -->
+            <div v-if="activeTab === 'custom'">
+              <div v-if="!state.customWords || state.customWords.length === 0" style="text-align: center; color: #64748b; padding: 40px 0;">
+                <svg style="width: 48px; height: 48px; color: #cbd5e1; margin-bottom: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.754 18 7.5 18s3.332.523 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.75 0 3.332.477 4.5 1.253v13c-1.168-.727-2.754-1.253-4.5-1.253-1.75 0-3.332.523-4.5 1.253"/>
+                </svg>
+                <p>生词本还是空的，快去划词添加吧！</p>
+              </div>
+              <div v-else style="display: flex; flex-direction: column; gap: 16px;">
+                <div v-for="word in state.customWords" :key="word.id" class="word-item" style="padding-bottom: 16px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <strong style="font-size: 1.1rem; color: #0f172a;">{{ word.word[0] }}</strong>
+                    <span style="font-size: 0.85rem; color: #6b7280; font-weight: 600;">{{ word.pos }}</span>
+                  </div>
+                  <p style="margin-top: 4px; color: #475569; font-size: 0.95rem;">{{ word.meaning }}</p>
+                  <p v-if="word.example" style="margin-top: 6px; color: #64748b; font-size: 0.85rem; font-style: italic; background: #f8fafc; padding: 6px; border-radius: 4px;">"{{ word.example }}"</p>
+                  <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center;">
+                    <span style="font-size: 0.75rem; color: #94a3b8; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">来源: {{ word.topic }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import { vocabularyStore } from '../utils/vocabularyStore.js';
+import { getUserGoals, setUserGoals, USER_GOALS_UPDATED_EVENT } from '../utils/userGoals.js';
+import { getEffectiveVocabularyMode, getVocabularySettings, setVocabularySettings, VOCABULARY_SETTINGS_UPDATED_EVENT } from '../utils/vocabularySettings.js';
 
 // 获取 store 状态
 const state = vocabularyStore.state;
+const vocabularySettings = ref(getVocabularySettings());
+const activeTab = ref('records');
+const modeOptions = [
+  { value: 'auto', label: '自动推荐' },
+  { value: 'ebbinghaus', label: '艾宾浩斯' },
+  { value: 'quick', label: '迅速刷词' },
+];
 
 // 计算总词数
 const totalWords = vocabularyStore.getTotalWordCount();
@@ -187,6 +308,55 @@ const learningCount = computed(() => {
 const newCount = computed(() => {
   return totalWords - knownCount.value - learningCount.value;
 });
+
+// 背词日历逻辑
+function getTodayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+const currentMonth = ref(new Date());
+const selectedDate = ref(getTodayStr());
+const selectedDateWords = ref(vocabularyStore.getDailyWords(getTodayStr()));
+
+const daysInMonth = computed(() => {
+  const year = currentMonth.value.getFullYear();
+  const month = currentMonth.value.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const days = [];
+  
+  // 填充月初空白
+  const startDay = firstDay.getDay();
+  for (let i = 0; i < startDay; i++) {
+    days.push({ day: '', fullDate: '', hasRecord: false });
+  }
+  
+  // 填充日子
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const fullDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const record = state.dailyWords?.[fullDate];
+    const hasRecord = record && record.length > 0;
+    days.push({ day: d, fullDate, hasRecord });
+  }
+  
+  return days;
+});
+
+function prevMonth() {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() - 1, 1);
+}
+
+function nextMonth() {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + 1, 1);
+}
+
+function selectDate(dateObj) {
+  if (!dateObj.day) return;
+  selectedDate.value = dateObj.fullDate;
+  selectedDateWords.value = vocabularyStore.getDailyWords(dateObj.fullDate);
+}
 
 // 进度条计算 (圆环)
 const circleCircumference = 2 * Math.PI * 70; // 半径为70
@@ -221,6 +391,24 @@ const goalStatusText = computed(() => {
   return '今日尚未达标';
 });
 
+const effectiveMode = computed(() => getEffectiveVocabularyMode({
+  examDate: state.examDate,
+  reviewMode: vocabularySettings.value.reviewMode,
+}));
+
+const currentModeLabel = computed(() => {
+  return effectiveMode.value === 'ebbinghaus' ? '当前模式：艾宾浩斯背词' : '当前模式：迅速刷词';
+});
+
+const modeRecommendationText = computed(() => {
+  if (vocabularySettings.value.reviewMode !== 'auto') {
+    return '你已在设置中手动固定该模式。';
+  }
+  return effectiveMode.value === 'ebbinghaus'
+    ? '距离考试还有两个月及以上，系统优先推荐长期记忆型复习。'
+    : '距离考试较近，系统优先推荐更高节奏的迅速刷词。';
+});
+
 // 考试日期编辑逻辑
 const isEditingDate = ref(false);
 const tempExamDate = ref(state.examDate);
@@ -250,8 +438,37 @@ function saveExamDate() {
   isEditingDate.value = false;
   if (tempExamDate.value !== state.examDate) {
     vocabularyStore.setExamDate(tempExamDate.value);
+    setUserGoals({ examDate: tempExamDate.value });
   }
 }
+
+function setReviewMode(mode) {
+  vocabularySettings.value = {
+    ...vocabularySettings.value,
+    reviewMode: mode,
+  };
+  setVocabularySettings({ reviewMode: mode });
+}
+
+function refreshVocabularySettings() {
+  vocabularySettings.value = getVocabularySettings();
+}
+
+function refreshExamDateSync() {
+  vocabularyStore.syncExamDateWithUserGoals();
+  tempExamDate.value = vocabularyStore.state.examDate || getUserGoals().examDate || '';
+}
+
+onMounted(() => {
+  refreshExamDateSync();
+  window.addEventListener(VOCABULARY_SETTINGS_UPDATED_EVENT, refreshVocabularySettings);
+  window.addEventListener(USER_GOALS_UPDATED_EVENT, refreshExamDateSync);
+});
+
+onUnmounted(() => {
+  window.removeEventListener(VOCABULARY_SETTINGS_UPDATED_EVENT, refreshVocabularySettings);
+  window.removeEventListener(USER_GOALS_UPDATED_EVENT, refreshExamDateSync);
+});
 </script>
 
 <style scoped>
@@ -265,11 +482,12 @@ function saveExamDate() {
 /* 英雄卡片 */
 .hero-card {
   position: relative;
-  background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 54%, #bfdbfe 100%);
   border: none;
   overflow: hidden;
   padding: 32px;
   border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .hero-bg-glow {
@@ -278,7 +496,7 @@ function saveExamDate() {
   right: -20%;
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(255, 94, 98, 0.2) 0%, rgba(255, 94, 98, 0) 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, rgba(59, 130, 246, 0) 70%);
   border-radius: 50%;
   filter: blur(40px);
 }
@@ -296,17 +514,73 @@ function saveExamDate() {
 }
 
 .text-white {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .text-white-muted {
-  color: rgba(255, 255, 255, 0.7);
+  color: #475569;
 }
 
 .margin-top-sm {
   margin-top: 12px;
   font-size: 1.05rem;
   line-height: 1.6;
+}
+
+.mode-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 0.88rem;
+  font-weight: 760;
+}
+
+.mode-text {
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.mode-switcher {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mode-switch-btn {
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(255, 255, 255, 0.68);
+  color: #334155;
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 0.88rem;
+  font-weight: 760;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.mode-switch-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(37, 99, 235, 0.28);
+}
+
+.mode-switch-btn.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }
 
 .action-buttons {
@@ -319,20 +593,20 @@ function saveExamDate() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(90deg, #FF5E62 0%, #FF9966 100%);
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border: none;
   padding: 12px 24px;
   border-radius: 12px;
   font-weight: 760;
   font-size: 1rem;
-  box-shadow: 0 4px 15px rgba(255, 94, 98, 0.3);
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.28);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .premium-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 94, 98, 0.4);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.36);
   filter: brightness(1.05);
 }
 
@@ -387,7 +661,7 @@ function saveExamDate() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: white;
+  color: #0f172a;
 }
 
 .progress-text .percentage {
@@ -398,7 +672,7 @@ function saveExamDate() {
 
 .progress-text .label {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -568,9 +842,109 @@ function saveExamDate() {
 .new .stat-label { color: #6b7280; }
 .new .bar-fill { background: #6b7280; }
 
+/* 背词日历 */
+.calendar-card {
+  max-width: 360px;
+  margin: 0 auto;
+  background: #ffffff !important;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 5px;
+}
+
+.weekday {
+  text-align: center;
+  font-weight: 760;
+  color: #64748b;
+  padding: 6px 0;
+  font-size: 0.85rem;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.calendar-day:hover {
+  background: #f8fafc;
+  transform: translateY(-1px);
+  border-color: #cbd5e1;
+}
+
+.calendar-day.empty {
+  background: transparent;
+  cursor: default;
+  border: none;
+}
+
+.calendar-day.empty:hover {
+  background: none !important;
+  transform: none !important;
+}
+
+.calendar-day.has-record {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.calendar-day.has-record:hover {
+  background: #dbeafe;
+}
+
+.calendar-day.has-record .day-num {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.calendar-day .day-num {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
+  font-family: 'Outfit', sans-serif;
+}
+
+.calendar-day .dot {
+  width: 4px;
+  height: 4px;
+  background: #2563eb;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.calendar-day.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
 @media (max-width: 1024px) {
   .metrics-grid, .stats-grid {
     grid-template-columns: 1fr;
+  }
+  .calendar-layout {
+    flex-direction: column;
+  }
+  .calendar-card {
+    width: 100% !important;
+    max-width: none !important;
   }
   .hero-content {
     flex-direction: column;

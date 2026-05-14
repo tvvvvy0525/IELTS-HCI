@@ -141,6 +141,7 @@
       <div v-if="record.transcript" class="section-block">
         <h3 class="section-title">转写全文</h3>
         <div class="transcript-block">
+          <audio v-if="audioUrl" :src="audioUrl" controls style="width: 100%; margin-bottom: 12px;"></audio>
           <p>{{ record.transcript }}</p>
           <span class="rule-badge" style="margin-top:10px;display:inline-block">{{ feedback.source === 'rule-based' ? '规则评分（无 AI）' : 'AI 评分' }}</span>
         </div>
@@ -151,18 +152,32 @@
         description="可以继续做一轮口语练习，回看历史记录，或返回总览安排下一项任务。"
         :actions="nextActions"
       />
+
+      <!-- 恭喜完成今日任务弹窗 -->
+      <div v-if="showFinishModal" class="finish-backdrop" @click="showFinishModal = false">
+        <div class="finish-card" @click.stop>
+          <div class="finish-emoji">🎉</div>
+          <h3 class="finish-title">恭喜你完成了今日任务！</h3>
+          <div class="finish-actions" style="margin-top: 20px;">
+            <button class="primary-btn" @click="$router.push('/exam/dashboard')">返回 Dashboard</button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getExamHistory } from '../utils/examHistory.js'
 import AiDisclaimer from '../components/AiDisclaimer.vue'
 import NextActionPanel from '../components/NextActionPanel.vue'
+import { getAudio } from '../utils/audioStorage.js'
+import { isMockMode, getNextMockRoute } from '../utils/mockTestFlow.js'
 
 const route = useRoute()
+const router = useRouter()
 import { autoGradeSpeaking } from '../utils/speakingAiClient.js';
 
 const feedback = ref(null)
@@ -209,11 +224,32 @@ const asrProviderLabel = computed(() => {
 })
 
 const activeAnalysis = ref({})
+const showFinishModal = ref(false)
+const audioUrl = ref('')
+
+watch(() => record.value?.examId, async (newId) => {
+  if (newId) {
+    const blob = await getAudio(newId)
+    if (blob) {
+      audioUrl.value = URL.createObjectURL(blob)
+    }
+  }
+})
 
 const nextActions = computed(() => ([
   { label: '再练一套', variant: 'primary', to: '/exam/speaking' },
   { label: '查看记录', variant: 'ghost', to: '/exam/history' },
-  { label: '进入下一科', variant: 'ghost', to: '/exam/dashboard' },
+  { 
+    label: '进入下一科', 
+    variant: 'ghost', 
+    onClick: () => { 
+      if (isMockMode()) {
+        router.push(getNextMockRoute())
+      } else {
+        showFinishModal.value = true 
+      }
+    } 
+  },
 ]))
 
 function toggleAnalysis(key) {
@@ -621,5 +657,54 @@ function formatDur(secs) {
   margin-top: 12px;
   color: #ef4444;
   font-size: 0.9rem;
+}
+
+/* 恭喜完成今日任务弹窗专用样式 */
+.finish-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.finish-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+}
+
+.finish-emoji {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.finish-title {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.finish-text {
+  margin: 0 0 24px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.finish-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 </style>

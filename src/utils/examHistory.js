@@ -295,6 +295,17 @@ export function getSubjectStats(subject, storage) {
   }
 }
 
+export function getUniqueSubjectCount(subject, storage) {
+  const records = getExamHistory(storage).filter((record) => record.subject === subject)
+  if (subject === 'listening' || subject === 'reading') {
+    return new Set(records.map((record) => record.examId).filter(Boolean)).size
+  }
+  if (subject === 'speaking') {
+    return new Set(records.map((record) => record.title).filter(Boolean)).size
+  }
+  return records.length
+}
+
 export function seedMockExamHistory(storage) {
   const targetStorage = resolveStorage(storage)
   const seedRecords = [

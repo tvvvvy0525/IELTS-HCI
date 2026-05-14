@@ -25,6 +25,10 @@ function normalizeDraftState(state) {
     isSubmitted: Boolean(state?.isSubmitted),
     gradingResult: normalizeObject(state?.gradingResult),
     answeredMap: normalizeObject(state?.answeredMap),
+    readingOverrides: normalizeObject(state?.readingOverrides),
+    submissionTimestamp: typeof state?.submissionTimestamp === 'string' ? state.submissionTimestamp : null,
+    explanationPanelExpanded: Boolean(state?.explanationPanelExpanded),
+    resultPanelHeight: Number.isFinite(Number(state?.resultPanelHeight)) ? Number(state.resultPanelHeight) : null,
   }
 }
 

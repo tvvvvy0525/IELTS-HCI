@@ -1,7 +1,21 @@
 <template>
   <div class="trend-chart-container">
     <div class="chart-header">
-      <h3 class="chart-title">写作分数趋势</h3>
+      <div class="chart-header-top">
+        <h3 class="chart-title">{{ title }}</h3>
+        <div v-if="tabs.length" class="chart-tabs">
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            class="chart-tab"
+            :class="{ active: tab.value === activeTab }"
+            type="button"
+            @click="$emit('change-tab', tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+      </div>
     </div>
     <div v-if="hasData" class="chart-wrapper">
       <Line :data="chartData" :options="chartOptions" />
@@ -10,7 +24,7 @@
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/>
       </svg>
-      <p>暂无已批改的写作记录，快去完成第一篇作文吧！</p>
+      <p>{{ emptyText }}</p>
     </div>
   </div>
 </template>
@@ -42,6 +56,10 @@ ChartJS.register(
 )
 
 const props = defineProps({
+  title: {
+    type: String,
+    default: '趋势图'
+  },
   labels: {
     type: Array,
     required: true
@@ -49,19 +67,42 @@ const props = defineProps({
   dataPoints: {
     type: Array,
     required: true
+  },
+  metricType: {
+    type: String,
+    default: 'band' // band | accuracy
+  },
+  tabs: {
+    type: Array,
+    default: () => []
+  },
+  activeTab: {
+    type: String,
+    default: ''
+  },
+  emptyText: {
+    type: String,
+    default: '暂无数据'
   }
 })
 
+defineEmits(['change-tab'])
+
 const hasData = computed(() => props.dataPoints.length > 0)
 
-const clampedDataPoints = computed(() => props.dataPoints.map(val => Math.max(5.0, val)))
+const normalizedDataPoints = computed(() => {
+  if (props.metricType === 'accuracy') {
+    return props.dataPoints.map((val) => Math.max(0, Math.min(100, Number(val) || 0)))
+  }
+  return props.dataPoints.map((val) => Math.max(5.0, Number(val) || 0))
+})
 
 const chartData = computed(() => ({
   labels: props.labels,
   datasets: [
     {
       label: 'Band Score',
-      data: clampedDataPoints.value,
+      data: normalizedDataPoints.value,
       borderColor: '#3b63e0',
       backgroundColor: 'rgba(59, 99, 224, 0.1)',
       borderWidth: 2,
@@ -76,7 +117,7 @@ const chartData = computed(() => ({
   ]
 }))
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -94,6 +135,9 @@ const chartOptions = {
       callbacks: {
         label: function(context) {
           const originalValue = props.dataPoints[context.dataIndex];
+          if (props.metricType === 'accuracy') {
+            return `正确率: ${originalValue}%`
+          }
           if (originalValue <= 5.0) {
             return `Band: ≤ 5.0 (${originalValue})`
           }
@@ -104,12 +148,13 @@ const chartOptions = {
   },
   scales: {
     y: {
-      min: 5.0,
-      max: 9.0,
+      min: props.metricType === 'accuracy' ? 0 : 5.0,
+      max: props.metricType === 'accuracy' ? 100 : 9.0,
       ticks: {
-        stepSize: 0.5,
+        stepSize: props.metricType === 'accuracy' ? 20 : 0.5,
         color: '#64748b',
         callback: function(value) {
+          if (props.metricType === 'accuracy') return `${value}%`
           if (value === 5.0) return '≤ 5.0'
           return value
         }
@@ -127,7 +172,7 @@ const chartOptions = {
       }
     }
   }
-}
+}))
 </script>
 
 <style scoped>
@@ -144,11 +189,41 @@ const chartOptions = {
   margin-bottom: 20px;
 }
 
+.chart-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .chart-title {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
   margin: 0;
+}
+
+.chart-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-tab {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.chart-tab.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
 }
 
 .chart-wrapper {

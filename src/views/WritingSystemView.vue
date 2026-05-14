@@ -98,74 +98,99 @@
 
     <!-- Add Question Mode -->
     <div v-else-if="viewMode === 'add_question'" class="add-question-view card" style="padding: 32px; width: 100%; max-width: 1200px; margin: 20px auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h3 style="margin: 0;">录入新题</h3>
-        <button class="ghost-btn" type="button" @click="viewMode = 'library'">返回题库</button>
-      </div>
-
-      <form @submit.prevent="saveNewQuestion" style="display: flex; flex-direction: column; gap: 16px;">
-        <div style="display: flex; gap: 16px; align-items: center;">
-          <label style="font-weight: 600;">题目类型:</label>
-          <div style="display: flex; gap: 12px;">
-            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-              <input type="radio" v-model="newQuestion.taskType" value="task1"> Task 1
-            </label>
-            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-              <input type="radio" v-model="newQuestion.taskType" value="task2"> Task 2
-            </label>
-          </div>
+      <!-- 未保存时显示表单 -->
+      <div v-if="!isQuestionSaved">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <h3 style="margin: 0;">录入新题</h3>
+          <button class="ghost-btn" type="button" @click="viewMode = 'library'">返回题库</button>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-weight: 600;">标题 (必填):</label>
-          <input type="text" v-model="newQuestion.title" placeholder="例如: Tourist Island 或 Government Spending" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;" required>
-        </div>
-
-        <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px; position: relative;">
-          <label style="font-weight: 600;">图表类型 (必填):</label>
-          <div style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 38px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; background: white;" @click="showTypeDropdown = !showTypeDropdown">
-            <span v-if="selectedChartTypes.length === 0" style="color: var(--text-secondary);">选择图表类型 (可多选)...</span>
-            <div v-for="type in selectedChartTypes" :key="type" style="background: var(--surface-hover); color: var(--text-main); padding: 2px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-              {{ type }}
-              <span style="cursor: pointer; font-weight: bold;" @click.stop="selectedChartTypes.splice(selectedChartTypes.indexOf(type), 1)">×</span>
+        <form @submit.prevent="saveNewQuestion" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <label style="font-weight: 600;">题目类型:</label>
+            <div style="display: flex; gap: 12px;">
+              <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="radio" v-model="newQuestion.taskType" value="task1"> Task 1
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="radio" v-model="newQuestion.taskType" value="task2"> Task 2
+              </label>
             </div>
           </div>
 
-          <div v-if="showTypeDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 4px;">
-            <label v-for="option in chartTypeOptions" :key="option" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 0;">
-              <input type="checkbox" :value="option" v-model="selectedChartTypes" style="cursor: pointer;" @click.stop>
-              <span>{{ option }}</span>
-            </label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-weight: 600;">标题 (必填):</label>
+            <input type="text" v-model="newQuestion.title" placeholder="例如: Tourist Island 或 Government Spending" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;" required>
+          </div>
+
+          <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px; position: relative;">
+            <label style="font-weight: 600;">图表类型 (必填):</label>
+            <div style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; min-height: 38px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; background: white;" @click="showTypeDropdown = !showTypeDropdown">
+              <span v-if="selectedChartTypes.length === 0" style="color: var(--text-secondary);">选择图表类型 (可多选)...</span>
+              <div v-for="type in selectedChartTypes" :key="type" style="background: var(--surface-hover); color: var(--text-main); padding: 2px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                {{ type }}
+                <span style="cursor: pointer; font-weight: bold;" @click.stop="selectedChartTypes.splice(selectedChartTypes.indexOf(type), 1)">×</span>
+              </div>
+            </div>
+
+            <div v-if="showTypeDropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 4px;">
+              <label v-for="option in chartTypeOptions" :key="option" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 0;">
+                <input type="checkbox" :value="option" v-model="selectedChartTypes" style="cursor: pointer;" @click.stop>
+                <span>{{ option }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div v-if="newQuestion.taskType === 'task2'" style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-weight: 600;">话题分类 (选填):</label>
+            <input type="text" v-model="newQuestion.topic" placeholder="例如: Education, Environment, Technology" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;">
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-weight: 600;">题目内容 (Prompt) (必填):</label>
+            <textarea v-model="newQuestion.prompt" rows="6" placeholder="输入完整的题目要求..." style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; font-family: inherit;" required></textarea>
+          </div>
+
+          <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-weight: 600;">上传图片 (必填):</label>
+            <div style="border: 2px dashed var(--border); padding: 20px; border-radius: 6px; text-align: center; cursor: pointer;" @click="$refs.fileInput.click()">
+              <span style="color: var(--text-secondary);">点击选择图片 或 拖拽图片到这里</span>
+              <input type="file" ref="fileInput" style="display: none;" accept="image/*" @change="handleImageUpload">
+            </div>
+            <div v-if="newQuestion.chartImage" style="margin-top: 8px;">
+              <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">已选择图片:</div>
+              <img :src="newQuestion.chartImage" style="max-height: 150px; border-radius: 4px; border: 1px solid var(--border);">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+            <button class="ghost-btn" type="button" @click="viewMode = 'library'">取消</button>
+            <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" type="submit">保存题目</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 已保存时显示选择界面 -->
+      <div v-else style="text-align: center; padding: 40px 0;">
+        <div style="font-size: 48px; color: #10b981; margin-bottom: 16px;">✓</div>
+        <h3 style="margin-bottom: 8px; color: #0f172a;">题目已成功录入！</h3>
+        <p style="color: #64748b; margin-bottom: 32px;">您可以选择现在为这道题录入一篇范文，或者跳过直接返回题库。</p>
+        
+        <div v-if="!isEnteringExemplar" style="display: flex; justify-content: center; gap: 16px;">
+          <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" @click="isEnteringExemplar = true">录入范文</button>
+          <button class="ghost-btn" @click="finishAddQuestion">跳过，返回题库</button>
+        </div>
+        
+        <!-- 录入范文的输入框 -->
+        <div v-else style="max-width: 600px; margin: 0 auto; text-align: left;">
+          <label style="font-weight: 600; display: block; margin-bottom: 8px; color: #0f172a;">输入范文内容:</label>
+          <textarea v-model="newExemplarText" rows="10" placeholder="请输入或粘贴范文..." style="padding: 12px; border: 1px solid var(--border); border-radius: 6px; width: 100%; font-family: inherit;"></textarea>
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+            <button class="ghost-btn" @click="finishAddQuestion">稍后录入</button>
+            <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" @click="saveExemplar">保存范文</button>
           </div>
         </div>
-
-        <div v-if="newQuestion.taskType === 'task2'" style="display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-weight: 600;">话题分类 (选填):</label>
-          <input type="text" v-model="newQuestion.topic" placeholder="例如: Education, Environment, Technology" style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%;">
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-weight: 600;">题目内容 (Prompt) (必填):</label>
-          <textarea v-model="newQuestion.prompt" rows="6" placeholder="输入完整的题目要求..." style="padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; font-family: inherit;" required></textarea>
-        </div>
-
-        <div v-if="newQuestion.taskType === 'task1'" style="display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-weight: 600;">上传图片 (必填):</label>
-          <div style="border: 2px dashed var(--border); padding: 20px; border-radius: 6px; text-align: center; cursor: pointer;" @click="$refs.fileInput.click()">
-            <span style="color: var(--text-secondary);">点击选择图片 或 拖拽图片到这里</span>
-            <input type="file" ref="fileInput" style="display: none;" accept="image/*" @change="handleImageUpload">
-          </div>
-          <div v-if="newQuestion.chartImage" style="margin-top: 8px;">
-            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">已选择图片:</div>
-            <img :src="newQuestion.chartImage" style="max-height: 150px; border-radius: 4px; border: 1px solid var(--border);">
-          </div>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
-          <button class="ghost-btn" type="button" @click="viewMode = 'library'">取消</button>
-          <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" type="submit">保存题目</button>
-        </div>
-      </form>
+      </div>
     </div>
 
     <!-- Exemplars View -->
@@ -207,6 +232,33 @@
             <div v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--text-muted);">
               <span>您还没有练习过这道题</span>
               <button class="primary-btn" style="margin-top: 12px;" @click="startQuestionPractice(currentQuestion)">去写一篇</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: My Exemplar -->
+        <div class="card" style="padding: 20px; background: var(--surface-hover); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; color: var(--accent);">我的范文</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button v-if="myExemplar" class="ghost-btn" style="padding: 2px 8px; font-size: 12px;" @click="startEditingMyExemplar">编辑</button>
+              <button v-if="myExemplar" class="ghost-btn" style="padding: 2px 8px; font-size: 12px; color: var(--error); border-color: var(--error);" @click="deleteMyExemplar">删除</button>
+            </div>
+          </div>
+          <div class="exemplar-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
+            <div v-if="!isEditingMyExemplar">
+              <div v-if="myExemplar" v-html="renderEssayParagraphs(myExemplar)"></div>
+              <div v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: var(--text-muted);">
+                <span>暂无自定义范文</span>
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer; margin-top: 12px;" @click="startEditingMyExemplar">录入范文</button>
+              </div>
+            </div>
+            <div v-else style="display: flex; flex-direction: column; gap: 12px;">
+              <textarea v-model="tempMyExemplarText" rows="10" placeholder="请输入或粘贴您的范文..." style="padding: 12px; border: 1px solid var(--border); border-radius: 6px; width: 100%; font-family: inherit;"></textarea>
+              <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="ghost-btn" @click="isEditingMyExemplar = false">取消</button>
+                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer;" @click="saveMyExemplar">保存范文</button>
+              </div>
             </div>
           </div>
         </div>
@@ -382,7 +434,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { saveExamRecord } from '../utils/examHistory.js'
 import {
@@ -419,6 +471,17 @@ const seedPrompts = ref(getSeedPrompts())
 const viewMode = ref('library')
 const writingMode = ref(loadWritingMode())
 const isBeginnerMode = computed(() => writingMode.value === 'beginner')
+
+onMounted(() => {
+  const promptId = route.query.promptId
+  if (promptId) {
+    const prompts = getSeedPrompts()
+    const q = prompts.task1.find(item => item.id === promptId) || prompts.task2.find(item => item.id === promptId)
+    if (q) {
+      startQuestionPractice(q)
+    }
+  }
+})
 
 const showExemplarModal = ref(false) // 保留，以防万一
 const currentQuestion = ref(null)
@@ -748,11 +811,48 @@ function editPracticeTask1(item) {
   loadPractice(item.id)
 }
 
+const myExemplar = ref('')
+const isEditingMyExemplar = ref(false)
+const tempMyExemplarText = ref('')
+
 function viewQuestionExemplar(q) {
   practices.value = getPractices()
   feedbackList.value = getFeedbackList()
-  currentQuestion.value = q
+  
+  currentQuestion.value = JSON.parse(JSON.stringify(q))
+  
+  const myExemplars = JSON.parse(localStorage.getItem('writing_my_exemplars') || '{}')
+  myExemplar.value = myExemplars[q.id] || ''
+  
   viewMode.value = 'exemplars'
+}
+
+function startEditingMyExemplar() {
+  isEditingMyExemplar.value = true
+  tempMyExemplarText.value = myExemplar.value
+}
+
+function saveMyExemplar() {
+  if (!currentQuestion.value) return
+  
+  const myExemplars = JSON.parse(localStorage.getItem('writing_my_exemplars') || '{}')
+  myExemplars[currentQuestion.value.id] = tempMyExemplarText.value
+  localStorage.setItem('writing_my_exemplars', JSON.stringify(myExemplars))
+  
+  myExemplar.value = tempMyExemplarText.value
+  isEditingMyExemplar.value = false
+  alert('范文保存成功！')
+}
+
+function deleteMyExemplar() {
+  if (!confirm('确定要删除您的自定义范文吗？')) return
+  
+  const myExemplars = JSON.parse(localStorage.getItem('writing_my_exemplars') || '{}')
+  delete myExemplars[currentQuestion.value.id]
+  localStorage.setItem('writing_my_exemplars', JSON.stringify(myExemplars))
+  
+  myExemplar.value = ''
+  alert('范文已删除！')
 }
 
 const newQuestion = ref({
@@ -793,6 +893,47 @@ function addNewQuestion() {
   }
   selectedChartTypes.value = []
   showTypeDropdown.value = false
+  isQuestionSaved.value = false
+  isEnteringExemplar.value = false
+  newExemplarText.value = ''
+}
+
+const isQuestionSaved = ref(false)
+const isEnteringExemplar = ref(false)
+const newExemplarText = ref('')
+const savedQuestionId = ref('')
+
+function saveExemplar() {
+  if (!newExemplarText.value.trim()) {
+    alert('请输入范文内容！')
+    return
+  }
+  
+  const customQuestions = JSON.parse(localStorage.getItem('writing_custom_questions') || '{"task1":[], "task2":[]}')
+  const taskType = newQuestion.value.taskType
+  const qList = customQuestions[taskType]
+  const q = qList.find(item => item.id === savedQuestionId.value)
+  if (q) {
+    q.exemplar = newExemplarText.value
+    localStorage.setItem('writing_custom_questions', JSON.stringify(customQuestions))
+    
+    const seedList = seedPrompts.value[taskType]
+    const seedQ = seedList.find(item => item.id === savedQuestionId.value)
+    if (seedQ) {
+      seedQ.exemplar = newExemplarText.value
+    }
+  }
+  
+  alert('范文保存成功！')
+  finishAddQuestion()
+}
+
+function finishAddQuestion() {
+  isQuestionSaved.value = false
+  isEnteringExemplar.value = false
+  newExemplarText.value = ''
+  savedQuestionId.value = ''
+  viewMode.value = 'library'
 }
 
 function handleImageUpload(event) {
@@ -847,7 +988,8 @@ function saveNewQuestion() {
   customQuestions[newQuestion.value.taskType].push(q)
   localStorage.setItem('writing_custom_questions', JSON.stringify(customQuestions))
 
-  viewMode.value = 'library'
+  savedQuestionId.value = q.id
+  isQuestionSaved.value = true
 }
 
 function createNewDraftForCurrent() {

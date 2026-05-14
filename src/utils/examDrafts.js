@@ -88,3 +88,10 @@ export function getLatestDraftSession(storage) {
 
   return drafts[0] || null
 }
+
+export function getDraftSessions(storage) {
+  const targetStorage = resolveStorage(storage)
+  return parseDrafts(targetStorage.getItem(EXAM_DRAFTS_STORAGE_KEY))
+    .map(normalizeDraftMeta)
+    .sort(sortByUpdatedAtDesc)
+}

@@ -146,3 +146,34 @@ ${essay}
   }
 }
 
+export async function explainWordInContext(word, sentence) {
+  const settings = getAiSettings();
+  if (settings.provider !== 'ollama') {
+    throw createAiError('CONFIG_ERROR', '当前未开启 Ollama 自动批改模式');
+  }
+  const { ollamaBaseUrl, ollamaModel, ollamaModelSample, requestTimeoutMs } = settings;
+  const targetModel = ollamaModelSample || ollamaModel;
+  
+  const prompt = `你是一名专业的英语老师。请帮我分析单词 "${word}" 在以下句子中的含义。
+  
+句子: "${sentence}"
+
+请直接返回 JSON 格式的数据，务必不要包含任何 Markdown 代码块包裹（如 \`\`\`json），也不要输出任何解释性文字。必须是纯 JSON。格式如下：
+{
+  "pos": "词性（如 n. / v. / adj. 等）",
+  "meaning": "在当前语境下的中文释义",
+  "example": "包含该单词的另一个例句（最好适合雅思备考）"
+}`;
+
+  try {
+    const rawResponse = await generateWritingFeedback(ollamaBaseUrl, targetModel, prompt, requestTimeoutMs);
+    let cleaned = rawResponse.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```json\s*|^\`\`\`\s*|```$/g, '').trim();
+    }
+    return JSON.parse(cleaned);
+  } catch (err) {
+    throw createAiError('GENERATION_ERROR', '词义解析失败: ' + err.message);
+  }
+}
+
