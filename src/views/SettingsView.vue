@@ -3,6 +3,7 @@
     <h2>系统设置</h2>
     <label class="setting-item">
       <span>目标分数</span>
+      <small class="setting-help">用于生成你的备考计划，也会显示在左侧侧边栏。</small>
       <select v-model="goals.targetBand" class="input" @change="saveGoals">
         <option value="6.0">Band 6.0</option>
         <option value="6.5">Band 6.5</option>
@@ -12,10 +13,12 @@
     </label>
     <label class="setting-item">
       <span>考试日期</span>
+      <small class="setting-help">设置后，系统会自动计算倒计时，并据此安排每日任务节奏。</small>
       <input v-model="goals.examDate" type="date" class="input" @change="saveGoals" />
     </label>
     <label class="setting-item">
       <span>AI 反馈模式</span>
+      <small class="setting-help">“手动评分”适合先跑通流程；“Ollama 本地模型”适合想直接用 AI 自动批改时使用。</small>
       <select v-model="settings.provider" class="input" @change="saveSettings">
         <option value="manual">手动评分 / 粘贴 JSON</option>
         <option value="ollama">Ollama 本地模型</option>
@@ -68,6 +71,7 @@
       <p class="section-desc">建议优先使用“自动”，练习时会优先用你配置的语音服务；服务不可用时自动切换到浏览器语音输入。</p>
       <label class="setting-item">
         <span>ASR 策略</span>
+        <small class="setting-help">ASR 就是语音转文字。新手建议保持“自动”，系统会尽量帮你选可用方案。</small>
         <select v-model="asrSettings.asrMode" class="input" @change="saveAsrSettings">
           <option value="auto">自动（Server → Local → Browser）</option>
           <option value="browser">仅浏览器语音识别</option>
@@ -78,6 +82,7 @@
 
       <label class="setting-item">
         <span>默认口语练习模式</span>
+        <small class="setting-help">“看题”更适合第一次练习；“听题”更接近真实考试场景。</small>
         <select v-model="asrSettings.questionMode" class="input" @change="saveAsrSettings">
           <option value="read">看题（显示文本，可选朗读）</option>
           <option value="listen">听题（隐藏文本，自动朗读）</option>
@@ -233,6 +238,11 @@ async function testServerAsr() {
 .setting-item span {
   font-weight: 500;
   color: var(--text);
+}
+.setting-help {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 .input {
   border: 1px solid var(--border-strong);

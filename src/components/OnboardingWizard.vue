@@ -96,7 +96,7 @@
           <button class="start-item-btn" type="button" @click="finishAndStart('/exam/writing')">从写作开始</button>
           <button class="start-item-btn" type="button" @click="finishAndStart('/exam/speaking')">从口语开始</button>
           <button class="start-item-btn" type="button" @click="finishAndStart('/exam/vocabulary/review')">从词汇开始</button>
-          <button class="start-item-btn muted" type="button" @click="finishAndStart('/exam/dashboard')">我是新手，先了解雅思考试</button>
+          <button class="start-item-btn muted" type="button" @click="finishAndStart('/exam/intro')">我是新手，先了解雅思考试</button>
         </div>
       </section>
 

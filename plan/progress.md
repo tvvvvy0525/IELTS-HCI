@@ -258,6 +258,45 @@
   - `plan/task_plan.md`
   - `plan/progress.md`
 
+## 会话：2026-05-14（Milestone 10 未完成任务推进）
+
+### 阶段 3：结果页统一下一步动作
+- **状态：** complete
+- 执行的操作：
+  - 新增统一 `NextActionPanel` 组件
+  - 接入 Reading / Listening / Writing / Speaking 结果页或反馈页
+  - 构建验证通过
+- 创建/修改的文件：
+  - `src/components/NextActionPanel.vue`
+  - `src/views/exam/PracticeView.vue`
+  - `src/views/exam/ListeningPracticeView.vue`
+  - `src/views/WritingFeedbackView.vue`
+  - `src/views/SpeakingFeedbackView.vue`
+
+### 阶段 4：P1 体验增强任务落地
+- **状态：** complete
+- 执行的操作：
+  - 完成写作新手模式、目标信息侧边栏联动、History 学习建议
+  - 完成降门槛说明文案、雅思入门页、AI 风险提示组件化
+  - 每个任务结束后均执行 `npm run build`，全部通过
+- 创建/修改的文件：
+  - `src/views/WritingSystemView.vue`
+  - `src/utils/userGoals.js`
+  - `src/views/ExamLayout.vue`
+  - `src/utils/historyInsights.js`
+  - `src/views/HistoryView.vue`
+  - `src/views/DashboardView.vue`
+  - `src/views/SettingsView.vue`
+  - `src/views/SpeakingSystemView.vue`
+  - `src/views/IeltsIntroView.vue`
+  - `src/router.js`
+  - `src/components/OnboardingWizard.vue`
+  - `src/components/AiDisclaimer.vue`
+  - `src/views/WritingFeedbackView.vue`
+  - `src/views/SpeakingFeedbackView.vue`
+  - `plan/task_plan.md`
+  - `plan/progress.md`
+
 ## 会话：2026-05-09（Milestone 5 规划）
 
 ### 阶段 1：词汇系统需求收敛
@@ -601,6 +640,35 @@
   - 修复 Task 1 点击“新建草稿”时左侧题目消失的 Reactivity Bug。
 - 创建/修改的文件：
   - `src/views/WritingSystemView.vue`
+
+---
+
+## 会话：2026-05-14（Writing 自动化体验与范文库独立化）
+
+### 阶段 1：Writing 自动化体验打磨
+- **状态：** complete
+- 执行的操作：
+  - 在批改页的 Ollama 修复弹窗中增加了纯 CSS 模拟打字动画，演示如何查看 Ollama 状态。
+  - 增加了折叠帮助文档，指导用户如何查看 Ollama 运行端口。
+  - 在“生成范文”按钮右侧增加了独立的模型选择器。
+  - 重构了范文生成的 Prompt，防止小模型复述指令，并移除了生成过程中跳动的字符数 UI。
+  - 实现了光标移到解析条目时，自动在左侧原文中高亮对应句子的交互效果。
+- 创建/修改的文件：
+  - `src/views/WritingFeedbackView.vue`
+  - `src/utils/writingAiClient.js`
+
+### 阶段 2：范文库独立界面化与数据打通
+- **状态：** complete
+- 执行的操作：
+  - 将“范文库”从简单的弹窗改为了独立的卡片式对比界面（`viewMode === 'exemplars'`）。
+  - 修正了 `writingPractice.js` 中读取原始范文字段名称的错误（从 `exemplar` 改为 `sample`）。
+  - 修改了 `firstPractice` 计算属性，使其能从 `feedbackList` 中正确读取 AI 生成的范文。
+  - 在打开范文库时增加了强制刷新数据的逻辑，确保能看到刚生成的范文。
+  - 为范文库的双栏卡片增加了 Markdown 渲染支持（利用 `marked`）。
+  - 修正了跳转路由参数和路径，解决了点击“对比查看”被踢回首页的问题（改用命名路由 `exam-writing-feedback`）。
+- 创建/修改的文件：
+  - `src/views/WritingSystemView.vue`
+  - `src/utils/writingPractice.js`
 
 ---
 *每个阶段完成后或遇到错误时更新此文件*

@@ -92,6 +92,12 @@
           本次全部答对，暂无错题解析。
         </div>
       </div>
+
+      <NextActionPanel
+        title="继续下一步"
+        description="可以马上再做一套阅读，去历史里回看本次结果，或切到今天的下一科。"
+        :actions="nextActions"
+      />
     </section>
 
     <!-- Selection Bar -->
@@ -124,6 +130,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import NextActionPanel from '../../components/NextActionPanel.vue'
 import { saveExamRecord } from '../../utils/examHistory.js'
 import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
 import {
@@ -196,6 +203,23 @@ const activeExplanation = computed(() => (
     ? findReadingExplanation(explanationData.value, activeExplanationQuestionId.value)
     : null
 ))
+const nextActions = computed(() => ([
+  {
+    label: '再练一套',
+    variant: 'primary',
+    to: { path: `/exam/reading/${examId}`, query: { reset: 'true' } },
+  },
+  {
+    label: '查看记录',
+    variant: 'ghost',
+    to: '/exam/history',
+  },
+  {
+    label: '进入下一科',
+    variant: 'ghost',
+    to: '/exam/listening',
+  },
+]))
 
 const explanationModules = import.meta.glob('../../../generated/reading-explanations/*.js')
 

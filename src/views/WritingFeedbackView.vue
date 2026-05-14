@@ -79,6 +79,13 @@
             <div class="progress-track">
               <div class="progress-track-fill"></div>
             </div>
+            <div class="waiting-tip-card">
+              <div>
+                <div class="waiting-tip-title">批改大约需要两分钟，等待的时候可以背会儿单词。</div>
+                <div class="waiting-tip-meta">{{ vocabWaitingSummary }}</div>
+              </div>
+              <button class="ghost-btn" type="button" @click="openVocabularyReviewInNewTab">新标签去背词</button>
+            </div>
           </div>
           <p class="hint" v-if="autoGradeMessage" :class="{'error-text': autoGradeError}">
             {{ autoGradeMessage }}
@@ -87,6 +94,7 @@
             <div class="console-header">实时思考过程...</div>
             <pre class="console-body">{{ streamingJson }}</pre>
           </div>
+          <AiDisclaimer />
         </section>
 
         <template v-if="aiSettings.provider !== 'ollama' || autoGradeError">
@@ -157,6 +165,7 @@
           <div class="markdown-body" v-if="feedback.commentsMd" style="margin-bottom: 24px; padding: 16px; background: var(--surface-hover); border-radius: 8px;">
             <div style="font-weight: 700; margin-bottom: 8px;">综合评语</div>
             <div class="md-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);" v-html="renderedCommentsMd"></div>
+            <AiDisclaimer v-if="feedback.source === 'ai'" />
           </div>
 
           <div class="deep-review-container">
@@ -237,6 +246,7 @@
               <div class="md-content" v-if="feedback.sampleEssay" v-html="renderedSampleEssay" @mouseover="handleMarkdownMouseOver" @mouseout="handleMarkdownMouseOut"></div>
               <template v-else-if="isGeneratingSample && !feedback.sampleEssayThinking"><span style="color: var(--text-muted); font-style: italic;">等待模型连接...</span></template>
             </div>
+            <AiDisclaimer v-if="feedback.sampleEssay || feedback.sampleEssayThinking || isGeneratingSample" />
           </div>
         </section>
 
@@ -255,6 +265,13 @@
             </div>
           </div>
         </section>
+
+        <NextActionPanel
+          v-if="practice"
+          title="继续下一步"
+          description="可以回到写作练笔继续修改，也可以查看历史记录，或开始今天的下一项任务。"
+          :actions="nextActions"
+        />
       </main>
     </div>
 
@@ -316,6 +333,17 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showModeUpgradeModal" class="wizard-backdrop" @click="dismissModeUpgrade">
+      <div class="wizard-card mode-upgrade-card" @click.stop>
+        <h3>已完成第一次写作流程</h3>
+        <p>你已经成功完成一次“选题 -> 写作 -> 提交 -> 反馈”。接下来是否切换到高级模式，查看范文库、练笔记录等更多功能？</p>
+        <div class="mode-upgrade-actions">
+          <button class="ghost-btn" type="button" @click="dismissModeUpgrade">继续新手模式</button>
+          <button class="primary-btn" type="button" @click="switchToAdvancedMode">切换到高级模式</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -323,8 +351,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
+import AiDisclaimer from '../components/AiDisclaimer.vue'
+import NextActionPanel from '../components/NextActionPanel.vue'
 import { task1Exemplars } from '../utils/writingExemplars.js'
 import { EXAM_HISTORY_UPDATED_EVENT, saveExamRecord } from '../utils/examHistory.js'
+import { vocabularyStore } from '../utils/vocabularyStore.js'
 import {
   WRITING_PRACTICES_UPDATED_EVENT,
   getPractices,
@@ -346,6 +377,8 @@ import { autoGradeWriting, autoGenerateSampleEssay } from '../utils/writingAiCli
 
 const route = useRoute()
 const router = useRouter()
+const WRITING_MODE_KEY = 'writing_mode_v1'
+const WRITING_MODE_PROMPTED_KEY = 'writing_mode_prompted_v1'
 
 const aiSettings = ref(getAiSettings())
 const isAutoGrading = ref(false)
@@ -366,6 +399,9 @@ const selectedPracticeId = ref('')
 const feedback = ref(createFeedback(''))
 const jsonInput = ref('')
 const parseMessage = ref('')
+const showModeUpgradeModal = ref(false)
+const hasCheckedModeUpgrade = ref(false)
+const vocabState = vocabularyStore.state
 
 const submittedPractices = computed(() =>
   practices.value
@@ -374,6 +410,28 @@ const submittedPractices = computed(() =>
 )
 
 const practice = computed(() => submittedPractices.value.find((p) => p.id === selectedPracticeId.value))
+const vocabWaitingSummary = computed(() => `今日词汇进度 ${vocabState.dailyProgress.knownCount} / ${vocabState.dailyGoal}`)
+const nextActions = computed(() => {
+  if (!practice.value) return []
+
+  return [
+    {
+      label: '再练一套',
+      variant: 'primary',
+      to: { path: '/exam/writing' },
+    },
+    {
+      label: '查看记录',
+      variant: 'ghost',
+      to: '/exam/history',
+    },
+    {
+      label: '进入下一科',
+      variant: 'ghost',
+      to: '/exam/dashboard',
+    },
+  ]
+})
 
 const currentExemplar = computed(() => {
   if (!practice.value) return null
@@ -509,6 +567,50 @@ function refreshData() {
   if (selectedPracticeId.value) {
     loadFeedbackByPracticeId(selectedPracticeId.value)
   }
+}
+
+function openVocabularyReviewInNewTab() {
+  if (typeof window === 'undefined') return
+  const reviewUrl = `${window.location.origin}${window.location.pathname}#/exam/vocabulary/review`
+  window.open(reviewUrl, '_blank', 'noopener,noreferrer')
+}
+
+function isBeginnerMode() {
+  if (typeof window === 'undefined') return true
+  return (localStorage.getItem(WRITING_MODE_KEY) || 'beginner') === 'beginner'
+}
+
+function hasPromptedModeUpgrade() {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem(WRITING_MODE_PROMPTED_KEY) === '1'
+}
+
+function markModeUpgradePrompted() {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(WRITING_MODE_PROMPTED_KEY, '1')
+}
+
+function maybePromptModeUpgrade() {
+  if (hasCheckedModeUpgrade.value) return
+  if (!practice.value) return
+  if (!isBeginnerMode()) return
+  if (hasPromptedModeUpgrade()) return
+
+  hasCheckedModeUpgrade.value = true
+  showModeUpgradeModal.value = true
+}
+
+function dismissModeUpgrade() {
+  markModeUpgradePrompted()
+  showModeUpgradeModal.value = false
+}
+
+function switchToAdvancedMode() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(WRITING_MODE_KEY, 'advanced')
+  }
+  markModeUpgradePrompted()
+  showModeUpgradeModal.value = false
 }
 
 function saveModelChange() {
@@ -778,6 +880,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(practice, () => {
+  maybePromptModeUpgrade()
+})
 
 function refreshAiSettings() {
   aiSettings.value = getAiSettings()
@@ -1055,6 +1161,30 @@ onUnmounted(() => {
   animation: loading-slide 1.35s ease-in-out infinite;
 }
 
+.waiting-tip-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.waiting-tip-title {
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.waiting-tip-meta {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
 @keyframes loading-slide {
   0% {
     transform: translateX(-120%);
@@ -1262,6 +1392,27 @@ onUnmounted(() => {
   animation: typing 3s steps(17, end) infinite, blink-caret 0.75s step-end infinite;
   overflow: hidden;
   max-width: 0;
+}
+
+.mode-upgrade-card {
+  max-width: 520px;
+}
+
+.mode-upgrade-card h3 {
+  margin: 0 0 10px;
+}
+
+.mode-upgrade-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.mode-upgrade-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 @keyframes typing {

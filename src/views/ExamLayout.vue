@@ -96,6 +96,17 @@
           练习记录
         </RouterLink>
 
+        <RouterLink to="/exam/intro" class="nav-item" :class="{ 'sidebar-pulse': isPulsing }">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </span>
+          雅思入门
+        </RouterLink>
+
         <RouterLink to="/exam/tools" class="nav-item">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -128,9 +139,9 @@
       <div class="sidebar-footer">
         <div class="sidebar-footer-top">
           <p>备考目标</p>
-          <span class="goal-badge">Band 6.5</span>
+          <span class="goal-badge">Band {{ userGoals.targetBand }}</span>
         </div>
-        <small>考试日期待设置 · 前往设置配置</small>
+        <small>{{ goalSummary }}</small>
       </div>
     </aside>
 
@@ -153,10 +164,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { getUserGoals, USER_GOALS_UPDATED_EVENT } from '../utils/userGoals.js'
 
 const route = useRoute()
+const userGoals = ref(getUserGoals())
+const isPulsing = ref(false)
 
 const routeTitleMap = {
   'exam-dashboard': '学习总览',
@@ -172,9 +186,61 @@ const routeTitleMap = {
   'exam-writing': '写作练习',
   'exam-speaking': '口语练习',
   'exam-history': '练习记录',
+  'exam-intro': '雅思入门',
   'exam-tools': '备考工具',
   'exam-settings': '系统设置',
 }
 
 const currentRouteName = computed(() => routeTitleMap[route.name] || 'IeltsCoach')
+const goalSummary = computed(() => {
+  if (!userGoals.value.examDate) {
+    return '考试日期待设置 · 前往设置配置'
+  }
+
+  const today = new Date()
+  const exam = new Date(userGoals.value.examDate)
+  const diffDays = Math.max(0, Math.ceil((exam.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+  return `考试日期 ${userGoals.value.examDate} · 距离考试 ${diffDays} 天`
+})
+
+function refreshUserGoals() {
+  userGoals.value = getUserGoals()
+}
+
+function handleHighlightIntro() {
+  isPulsing.value = true
+  setTimeout(() => {
+    isPulsing.value = false
+  }, 3000)
+}
+
+onMounted(() => {
+  window.addEventListener('storage', refreshUserGoals)
+  window.addEventListener(USER_GOALS_UPDATED_EVENT, refreshUserGoals)
+  window.addEventListener('highlight-sidebar-intro', handleHighlightIntro)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', refreshUserGoals)
+  window.removeEventListener(USER_GOALS_UPDATED_EVENT, refreshUserGoals)
+  window.removeEventListener('highlight-sidebar-intro', handleHighlightIntro)
+})
 </script>
+
+<style scoped>
+.sidebar-pulse {
+  animation: sidebarPulse 0.8s infinite alternate;
+  background: rgba(0, 102, 255, 0.1) !important;
+  color: #0066ff !important;
+  border-radius: 8px;
+}
+
+@keyframes sidebarPulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(0, 102, 255, 0.3);
+  }
+  to {
+    box-shadow: 0 0 0 10px rgba(0, 102, 255, 0);
+  }
+}
+</style>

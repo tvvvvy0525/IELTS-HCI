@@ -38,6 +38,17 @@
       </div>
     </section>
 
+    <section class="card history-insight-card">
+      <div>
+        <p class="eyebrow">建议</p>
+        <h3>{{ primaryInsight.title }}</h3>
+        <p>{{ primaryInsight.description }}</p>
+      </div>
+      <button class="primary-btn" type="button" @click="goInsight(primaryInsight.to)">
+        {{ primaryInsight.actionLabel }}
+      </button>
+    </section>
+
     <section v-if="records.length" class="list-container card">
       <table class="data-table">
         <thead>
@@ -115,6 +126,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { resolveRouteFromRecord } from '../utils/examNavigation.js'
+import { getHistoryInsights } from '../utils/historyInsights.js'
 import { WRITING_FEEDBACK_UPDATED_EVENT, getFeedbackList } from '../utils/writingFeedback.js'
 import { buildWritingHistoryAction } from '../utils/writingProgress.js'
 import { saveReadingDraftState } from '../utils/readingDraftState.js'
@@ -147,6 +159,9 @@ const filteredRecords = computed(() => {
 const latestCompletedAt = computed(() => {
   if (!records.value.length) return '暂无'
   return formatCompletedAt(records.value[0].timestamp)
+})
+const primaryInsight = computed(() => {
+  return getHistoryInsights(records.value)[0]
 })
 
 function refreshHistory() {
@@ -232,6 +247,10 @@ function clearRecords() {
   refreshHistory()
 }
 
+function goInsight(to) {
+  router.push(to)
+}
+
 onMounted(() => {
   refreshHistory()
   window.addEventListener('storage', refreshHistory)
@@ -257,6 +276,58 @@ onUnmounted(() => {
   color: var(--text-secondary);
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.history-insight-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 72%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+}
+
+.history-insight-card > div {
+  position: relative;
+  flex: 1;
+  padding-left: 18px;
+}
+
+.history-insight-card > div::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent) 0%, #60a5fa 100%);
+}
+
+.history-insight-card .eyebrow {
+  color: var(--accent);
+}
+
+.history-insight-card h3 {
+  margin: 4px 0 8px;
+  color: var(--text);
+  font-size: 1.22rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.history-insight-card p:last-child {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 0.97rem;
+}
+
+.history-insight-card .primary-btn {
+  min-width: 136px;
+  justify-content: center;
 }
 
 .history-toolbar-side {
@@ -334,5 +405,16 @@ onUnmounted(() => {
 
 .action-btn {
   white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .history-insight-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-insight-card .primary-btn {
+    width: 100%;
+  }
 }
 </style>

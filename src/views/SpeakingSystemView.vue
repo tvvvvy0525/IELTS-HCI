@@ -5,7 +5,7 @@
       <div class="hero-left">
         <p class="eyebrow">Speaking</p>
         <h2>口语练习</h2>
-        <p class="hero-desc">选择 Part 模式，录音后 AI 给出四维反馈。无需 API Key 也可完成完整练习。</p>
+        <p class="hero-desc">选择一个 Part 开始练习。完成录音后，系统会根据你的回答给出评分和建议。</p>
 
         <!-- ASR 状态条 -->
         <div class="asr-status" :class="asrStatusClass">
@@ -63,7 +63,7 @@
       <div class="topic-header">
         <div>
           <h3>选择话题</h3>
-          <p class="topic-desc">选择练习话题，或使用随机话题</p>
+          <p class="topic-desc">先选一个你愿意开口的主题；如果拿不准，也可以直接随机抽题。</p>
         </div>
         <button class="ghost-btn" @click="randomTopic" type="button">🎲 随机话题</button>
       </div>
@@ -89,7 +89,7 @@
         </svg>
         开始 {{ selectedPart }} 练习
       </button>
-      <span class="start-hint">练习完成后将自动生成评分报告并保存记录</span>
+      <span class="start-hint">开始后会进入录音页面；练习完成后会自动保存并生成反馈。</span>
     </div>
   </div>
 </template>

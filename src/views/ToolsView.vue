@@ -3,8 +3,8 @@
     <section class="card tools-hero">
       <div>
         <p class="eyebrow">Tools</p>
-        <h2>常用工具现在可以直接执行。</h2>
-        <p class="tools-subtitle">在这里完成计时、分数换算和备考排期，不再只是看介绍卡片。</p>
+        <h2>练习辅助工具</h2>
+        <p class="tools-subtitle">提供计时、分数换算和备考计划，方便你随时辅助练习。</p>
       </div>
     </section>
 
@@ -297,22 +297,39 @@ onBeforeUnmount(() => {
 .tools-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .tools-hero {
-  padding: 24px;
+  padding: 24px 26px;
 }
 
 .tools-subtitle {
   color: var(--text-secondary);
   margin-top: 8px;
+  font-size: 0.96rem;
+  line-height: 1.65;
 }
 
 .tool-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
+  min-height: 100%;
+}
+
+.tool-panel h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.tool-panel > p {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
 }
 
 .tool-field {
@@ -322,8 +339,8 @@ onBeforeUnmount(() => {
 }
 
 .tool-field span {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 720;
   color: var(--text);
 }
 
@@ -332,11 +349,25 @@ onBeforeUnmount(() => {
 .tool-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
+  line-height: 1.4;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .preset-btn {
-  padding: 8px 12px;
+  min-height: 40px;
+  padding: 0 20px;
+  font-size: 0.98rem;
+  font-weight: 720;
 }
 
 .toggle-chip {
@@ -344,8 +375,10 @@ onBeforeUnmount(() => {
   background: var(--surface);
   color: var(--text-secondary);
   border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 0.84rem;
+  min-height: 40px;
+  padding: 0 24px;
+  font-size: 0.98rem;
+  font-weight: 720;
   cursor: pointer;
   transition: 0.2s ease;
 }
@@ -357,16 +390,23 @@ onBeforeUnmount(() => {
 }
 
 .timer-display {
-  font-size: 2.4rem;
-  line-height: 1;
-  font-weight: 800;
+  font-size: 3.1rem;
+  line-height: 0.95;
+  font-weight: 780;
   color: var(--text);
-  letter-spacing: 0.04em;
+  letter-spacing: -0.04em;
+}
+
+.tool-actions > .primary-btn,
+.tool-actions > .ghost-btn {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 0.98rem;
 }
 
 .tool-result {
-  padding: 14px;
-  border-radius: 14px;
+  padding: 22px 24px;
+  border-radius: 18px;
   border: 1px solid var(--border);
   background: var(--surface-hover);
 }
@@ -375,22 +415,25 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 7px 16px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-weight: 700;
-  font-size: 0.82rem;
+  font-weight: 760;
+  font-size: 0.95rem;
 }
 
 .tool-result-text {
   margin: 0;
   color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.65;
 }
 
 .tool-result-meta {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.84rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .tool-inline-error {
@@ -398,7 +441,8 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   background: rgba(220, 53, 69, 0.08);
   color: #c0392b;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
 .planner-result {
@@ -413,8 +457,8 @@ onBeforeUnmount(() => {
 }
 
 .planner-week {
-  padding: 14px;
-  border-radius: 12px;
+  padding: 18px 20px;
+  border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
 }
@@ -424,32 +468,42 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   color: var(--text);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  align-items: baseline;
+}
+
+.planner-week-header strong {
+  font-size: 1rem;
+  font-weight: 760;
 }
 
 .planner-week-header span {
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .planner-focus {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.6;
 }
 
 .planner-tasks {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 22px;
   color: var(--text-secondary);
+  font-size: 0.96rem;
+  line-height: 1.7;
 }
 
 .planner-tasks li + li {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 @media (max-width: 720px) {
   .timer-display {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .planner-week-header {

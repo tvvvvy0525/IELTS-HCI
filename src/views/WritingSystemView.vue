@@ -4,14 +4,33 @@
       <div>
         <p class="eyebrow">Writing</p>
         <h2>写作练习</h2>
-        <p>选择题目开始练笔，或录入新题进行练习。系统将保存您的草稿并提供范文参考。</p>
+        <p>{{ isBeginnerMode ? '按“选题 -> 写作 -> 提交 -> 反馈”的顺序完成第一次练习。' : '选择题目开始练笔，或录入新题进行练习。系统将保存您的草稿并提供范文参考。' }}</p>
+        <p v-if="isBeginnerMode" class="page-helper">“提交”后会进入批改页；如果暂时写不完，也可以先保存草稿，稍后继续。</p>
       </div>
       <div style="display: flex; align-items: center; gap: 24px;">
+        <div class="mode-switch">
+          <button
+            type="button"
+            class="mode-chip"
+            :class="{ active: isBeginnerMode }"
+            @click="setWritingMode('beginner')"
+          >
+            新手模式
+          </button>
+          <button
+            type="button"
+            class="mode-chip"
+            :class="{ active: !isBeginnerMode }"
+            @click="setWritingMode('advanced')"
+          >
+            高级模式
+          </button>
+        </div>
         <div class="catalog-count">
           <strong>{{ sortedPractices.length }}</strong>
           <span>篇草稿</span>
         </div>
-        <button v-if="viewMode === 'library'" class="ghost-btn" type="button" @click="addNewQuestion">录入新题</button>
+        <button v-if="viewMode === 'library' && !isBeginnerMode" class="ghost-btn" type="button" @click="addNewQuestion">录入新题</button>
         <button class="ghost-btn" type="button" @click="viewMode === 'library' ? goBack() : viewMode = 'library'">
           {{ viewMode === 'library' ? '返回首页' : '返回题库' }}
         </button>
@@ -20,6 +39,14 @@
 
     <!-- Library Mode -->
     <div v-if="viewMode === 'library'" class="writing-library card" style="padding: 20px;">
+      <div v-if="isBeginnerMode" class="beginner-intro card">
+        <div>
+          <p class="eyebrow">新手流程</p>
+          <h3>先选一道题，写完后直接提交批改。</h3>
+          <p>系统会自动保存草稿。第一次使用建议先从熟悉题面开始，不需要先看范文库或录入新题。</p>
+        </div>
+      </div>
+
       <div class="library-columns" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
         <!-- Task 1 Column -->
         <div class="library-column">
@@ -32,9 +59,9 @@
               </div>
               <div class="question-actions" style="display: flex; gap: 8px; flex-shrink: 0;">
                 <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer;" type="button" @click="startQuestionPractice(q)">
-                  {{ hasPractice(q.id) ? '练笔记录' : '首次练笔' }}
+                  {{ hasPractice(q.id) ? (isBeginnerMode ? '继续练习' : '练笔记录') : '开始练习' }}
                 </button>
-                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
+                <button v-if="!isBeginnerMode" style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
                   范文库
                 </button>
               </div>
@@ -53,9 +80,9 @@
               </div>
               <div class="question-actions" style="display: flex; gap: 8px; flex-shrink: 0;">
                 <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer;" type="button" @click="startQuestionPractice(q)">
-                  {{ hasPractice(q.id) ? '练笔记录' : '首次练笔' }}
+                  {{ hasPractice(q.id) ? (isBeginnerMode ? '继续练习' : '练笔记录') : '开始练习' }}
                 </button>
-                <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
+                <button v-if="!isBeginnerMode" style="display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; cursor: pointer;" type="button" @click="viewQuestionExemplar(q)">
                   范文库
                 </button>
               </div>
@@ -142,7 +169,7 @@
     </div>
 
     <!-- Exemplars View -->
-    <div v-else-if="viewMode === 'exemplars'" class="exemplars-view card" style="padding: 24px; width: 100%; max-width: 1200px; margin: 0 auto;">
+    <div v-else-if="viewMode === 'exemplars'" class="exemplars-view card" style="padding: 24px; width: 100%;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
         <div>
           <span style="color: var(--text-secondary); font-size: 12px; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;">{{ currentQuestion?.type || currentQuestion?.topic }}</span>
@@ -150,15 +177,15 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
         <!-- Card 1: Official Exemplar -->
         <div class="card" style="padding: 20px; background: var(--surface-hover); border: 1px solid var(--border);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h3 style="margin: 0; color: var(--accent);">官方范文</h3>
             <span style="font-size: 12px; color: var(--text-muted);">标准参考</span>
           </div>
-          <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
-            <div v-if="currentQuestion?.exemplar" v-html="renderMarkdown(currentQuestion.exemplar)"></div>
+          <div class="exemplar-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
+            <div v-if="currentQuestion?.exemplar" v-html="renderEssayParagraphs(currentQuestion.exemplar)"></div>
             <div v-else style="color: var(--text-muted); font-style: italic;">暂无官方范文</div>
           </div>
         </div>
@@ -172,7 +199,7 @@
               <button class="ghost-btn" style="padding: 2px 8px; font-size: 12px;" @click="goToPractice(firstPractice.id)">对比查看</button>
             </div>
           </div>
-          <div style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
+          <div class="exemplar-content" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); max-height: 500px; overflow-y: auto;">
             <div v-if="firstPractice?.sampleEssay" v-html="renderMarkdown(firstPractice.sampleEssay)"></div>
             <div v-else-if="firstPractice" style="color: var(--text-muted); font-style: italic;">
               该次练笔未生成范文。
@@ -201,7 +228,7 @@
         <!-- Right Column: Records or Editor -->
         <main class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
           <!-- If viewing records -->
-          <div v-if="!isEditingTask1" style="display: flex; flex-direction: column; gap: 16px;">
+          <div v-if="!isEditingTask1 && !isBeginnerMode" style="display: flex; flex-direction: column; gap: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <h3 style="margin: 0; font-size: 1.25rem;">练笔记录</h3>
               <button class="primary-btn" style="padding: 6px 12px; font-size: 14px;" @click="startNewDraftTask1">新建草稿</button>
@@ -222,7 +249,7 @@
           <div v-else style="display: flex; flex-direction: column; gap: 16px;">
             <!-- Top: Timer & Word Count -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 12px;">
-              <button class="ghost-btn" style="padding: 4px 8px; font-size: 12px;" @click="isEditingTask1 = false">← 返回练习记录</button>
+              <button class="ghost-btn" style="padding: 4px 8px; font-size: 12px;" @click="handleTask1Back">{{ isBeginnerMode ? '← 返回题库' : '← 返回练习记录' }}</button>
               <div style="font-weight: bold; color: var(--accent); font-size: 1.1rem;">倒计时 {{ formatRemain(remainingSeconds) }}</div>
               <div style="font-weight: bold; color: var(--text-main);">字数统计: {{ current.wordCount }}</div>
             </div>
@@ -272,9 +299,9 @@
           <div class="card" style="padding: 20px; flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <h3 style="margin: 0; font-size: 1.25rem;">练笔记录</h3>
-              <button class="primary-btn" style="padding: 6px 12px; font-size: 14px;" @click="createNewDraftForCurrent">新建草稿</button>
+              <button v-if="!isBeginnerMode" class="primary-btn" style="padding: 6px 12px; font-size: 14px;" @click="createNewDraftForCurrent">新建草稿</button>
             </div>
-            <ul style="list-style: none; padding: 0; margin: 0;">
+            <ul v-if="!isBeginnerMode" style="list-style: none; padding: 0; margin: 0;">
               <li v-for="item in sortedPractices" :key="item.id" style="padding: 12px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; justify-content: space-between; align-items: center;" @click="loadPractice(item.id)">
                 <div>
                   <div style="font-weight: 600; color: var(--text-main);">{{ new Date(item.updatedAt || item.createdAt).toLocaleString() }}</div>
@@ -284,6 +311,10 @@
               </li>
               <li v-if="sortedPractices.length === 0" style="padding: 20px; text-align: center; color: var(--text-secondary);">暂无练笔记录</li>
             </ul>
+            <div v-else class="beginner-side-hint">
+              <p>新手模式默认直接进入写作，不展示历史记录列表。</p>
+              <button class="ghost-btn" type="button" @click="createNewDraftForCurrent">重新开始这一题</button>
+            </div>
           </div>
         </aside>
 
@@ -373,6 +404,7 @@ import { marked } from 'marked'
 
 const route = useRoute()
 const router = useRouter()
+const WRITING_MODE_KEY = 'writing_mode_v1'
 
 function goBack() {
   router.push('/exam/dashboard')
@@ -385,9 +417,23 @@ const remainingSeconds = ref(current.value.remainingSeconds || current.value.dur
 const timerRunning = ref(false)
 const seedPrompts = ref(getSeedPrompts())
 const viewMode = ref('library')
+const writingMode = ref(loadWritingMode())
+const isBeginnerMode = computed(() => writingMode.value === 'beginner')
 
 const showExemplarModal = ref(false) // 保留，以防万一
 const currentQuestion = ref(null)
+
+function loadWritingMode() {
+  if (typeof window === 'undefined') return 'beginner'
+  return localStorage.getItem(WRITING_MODE_KEY) || 'beginner'
+}
+
+function setWritingMode(mode) {
+  writingMode.value = mode
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(WRITING_MODE_KEY, mode)
+  }
+}
 
 const firstPractice = computed(() => {
   if (!currentQuestion.value) return null
@@ -414,7 +460,29 @@ function goToPractice(id) {
 
 function renderMarkdown(text) {
   if (!text) return ''
-  return marked.parse(text)
+  return marked.parse(text, { breaks: true, gfm: true })
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderEssayParagraphs(text) {
+  if (!text) return ''
+
+  const paragraphs = String(text)
+    .split(/\n\s*\n|\n/g)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return paragraphs
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join('')
 }
 
 function formatDate(dateStr) {
@@ -620,7 +688,17 @@ function startQuestionPractice(q) {
   current.value.taskType = q.id.startsWith('t2') ? 'task2' : 'task1'
 
   if (current.value.taskType === 'task1') {
-    isEditingTask1.value = false
+    if (isBeginnerMode.value) {
+      const existingDraft = practices.value.find(p => p.promptId === q.id && p.status === 'draft')
+      if (existingDraft) {
+        loadPractice(existingDraft.id)
+      } else {
+        startNewDraftTask1()
+      }
+      isEditingTask1.value = true
+    } else {
+      isEditingTask1.value = false
+    }
   } else {
     isEditingTask1.value = true
     const existingDraft = practices.value.find(p => p.promptId === q.id && p.status === 'draft')
@@ -638,6 +716,14 @@ function startQuestionPractice(q) {
       saveDraft(false)
     }
   }
+}
+
+function handleTask1Back() {
+  if (isBeginnerMode.value) {
+    viewMode.value = 'library'
+    return
+  }
+  isEditingTask1.value = false
 }
 
 function startNewDraftTask1() {
@@ -985,6 +1071,72 @@ onBeforeUnmount(() => {
   background: var(--warning-soft);
 }
 
+.page-helper {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.mode-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  gap: 4px;
+}
+
+.mode-chip {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 720;
+  transition: 0.18s ease;
+}
+
+.mode-chip:hover {
+  color: var(--text);
+}
+
+.mode-chip.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.18);
+}
+
+.beginner-intro {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 72%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+
+.beginner-intro .eyebrow {
+  color: var(--accent);
+}
+
+.beginner-intro h3 {
+  margin: 4px 0 8px;
+  font-size: 1.24rem;
+  font-weight: 780;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.beginner-intro p:last-child {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 820px;
+}
+
 .practice-title {
   font-weight: 700;
   color: var(--text);
@@ -1055,6 +1207,15 @@ onBeforeUnmount(() => {
 
 .section-textarea {
   min-height: 120px;
+}
+
+.exemplar-content :deep(p) {
+  margin: 0 0 1.25em;
+  line-height: 1.8;
+}
+
+.exemplar-content :deep(p:last-child) {
+  margin-bottom: 0;
 }
 
 .chart-wrap {

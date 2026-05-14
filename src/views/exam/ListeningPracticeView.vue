@@ -2,6 +2,7 @@
   <div class="listening-practice-view fade-in">
     <div class="iframe-container" v-if="iframeSrc">
       <iframe 
+        :key="iframeRenderKey"
         ref="iframeRef"
         :src="iframeSrc" 
         class="practice-iframe" 
@@ -12,12 +13,21 @@
     <div class="loading" v-else>
       未找到题目页面路径，请跨题库返回重新选择。
     </div>
+
+    <div v-if="latestResult" class="listening-result-wrap">
+      <NextActionPanel
+        title="继续下一步"
+        :description="`本次得分 ${latestResult.score} / ${latestResult.maxScore}，可以继续重做、查看历史，或进入写作练习。`"
+        :actions="nextActions"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import NextActionPanel from '../../components/NextActionPanel.vue'
 import {
   buildListeningHistoryTitle,
   extractListeningSourceTitle,
@@ -27,12 +37,32 @@ import { clearDraftSession, saveDraftSession } from '../../utils/examDrafts.js'
 import { normalizeListeningAssetPath } from '../../utils/listeningAssetPath.js'
 
 const route = useRoute()
+const router = useRouter()
 const encodedPath = typeof route.query.path === 'string' ? route.query.path : ''
 const encodedTitle = route.query.title
 const examId = route.params.id
 
 const iframeRef = ref(null)
+const iframeRenderKey = ref(0)
+const latestResult = ref(null)
 let currentSessionTimestamp = null // 用于标识当前练习会话，实现手动改分时的记录覆盖
+const nextActions = computed(() => ([
+  {
+    label: '再练一套',
+    variant: 'primary',
+    onClick: retryListening,
+  },
+  {
+    label: '查看记录',
+    variant: 'ghost',
+    to: '/exam/history',
+  },
+  {
+    label: '进入下一科',
+    variant: 'ghost',
+    to: '/exam/writing',
+  },
+]))
 
 // 保存练习记录到全局历史
 const saveToHistory = (data) => {
@@ -69,9 +99,20 @@ const saveToHistory = (data) => {
     }
 
     console.log("Listening history updated:", recordTitle)
+    latestResult.value = {
+      score: data.score,
+      maxScore: data.maxScore,
+      durationSecs: data.durationSecs,
+    }
   } catch (e) {
     console.error("Failed to save listening history:", e)
   }
+}
+
+function retryListening() {
+  latestResult.value = null
+  currentSessionTimestamp = null
+  iframeRenderKey.value += 1
 }
 
 // 监听来自 iframe 的消息

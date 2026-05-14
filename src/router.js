@@ -16,6 +16,7 @@ import VocabularyWordView from './views/VocabularyWordView.vue'
 import VocabularyReviewView from './views/VocabularyReviewView.vue'
 import VocabularyCreateView from './views/VocabularyCreateView.vue'
 import HistoryView from './views/HistoryView.vue'
+import IeltsIntroView from './views/IeltsIntroView.vue'
 import ToolsView from './views/ToolsView.vue'
 import SettingsView from './views/SettingsView.vue'
 
@@ -55,6 +56,7 @@ const router = createRouter({
         { path: 'speaking/practice', name: 'exam-speaking-practice', component: SpeakingPracticeView },
         { path: 'speaking/feedback', name: 'exam-speaking-feedback', component: SpeakingFeedbackView },
         { path: 'history', name: 'exam-history', component: HistoryView },
+        { path: 'intro', name: 'exam-intro', component: IeltsIntroView },
         { path: 'tools', name: 'exam-tools', component: ToolsView },
         { path: 'settings', name: 'exam-settings', component: SettingsView },
       ],

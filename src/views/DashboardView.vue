@@ -1,5 +1,21 @@
 <template>
   <div class="dashboard-view">
+    <section v-if="!isIntroHidden" class="card intro-entry-card" style="margin-bottom: 20px;">
+      <div>
+        <p class="eyebrow">新手入口</p>
+        <h2>雅思入门</h2>
+        <p class="dashboard-subtitle">如果你还不清楚四科结构、分数怎么理解、今天该先练什么，可以先看这页。</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="ghost-btn" type="button" @click="openIntro">
+          进入雅思入门
+        </button>
+        <button class="ghost-btn" type="button" @click="hideIntro">
+          不再显示
+        </button>
+      </div>
+    </section>
+
     <section class="page-intro card">
       <div>
         <p class="eyebrow">今日概览</p>
@@ -7,6 +23,7 @@
         <p class="dashboard-subtitle">
           {{ recentSummary }}
         </p>
+        <p class="dashboard-helper">不知道先做什么时，直接点“开始今日任务”，系统会按推荐顺序带你开始。</p>
       </div>
       <button class="primary-btn" type="button" @click="startPractice">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -128,12 +145,51 @@
         进入词汇系统
       </button>
     </section>
+
+
   </div>
   <OnboardingWizard v-if="showOnboarding" @done="handleOnboardingDone" />
+
+  <!-- 新手入口隐藏提示弹窗 -->
+  <div v-if="showIntroDialog" class="intro-modal-overlay">
+    <div class="intro-modal-card">
+      <h3>可从侧边栏再次进入</h3>
+      <p>“雅思入门”入口已隐藏，您随时可以从侧边栏重新打开。</p>
+      
+      <!-- 纯 CSS 操作演示动画 -->
+      <div class="demo-animation">
+        <div class="mock-sidebar">
+          <!-- 学习中心 -->
+          <div class="mock-section-label"></div>
+          <div class="mock-item"></div>
+          <div class="mock-item"></div>
+          <div class="mock-item"></div>
+          <div class="mock-item"></div>
+          
+          <!-- 数据 & 工具 -->
+          <div style="font-size: 7px; color: #a0aec0; transform: scale(0.85); transform-origin: left; margin: 4px 2px 1px 2px; font-weight: bold;">数据 & 工具</div>
+          <div class="mock-item"></div>
+          <div class="mock-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span style="font-size: 8px; margin-left: 2px;">雅思入门</span>
+          </div>
+        </div>
+        <div class="mock-cursor"></div>
+      </div>
+
+      <button class="primary-btn" @click="showIntroDialog = false" style="width: 100%;">
+        我知道了
+      </button>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SubjectProgress from '../components/SubjectProgress.vue'
 import WritingTrendChart from '../components/WritingTrendChart.vue'
@@ -224,6 +280,16 @@ const trendData = reactive({
 const onboardingState = reactive(getOnboardingState())
 const showOnboarding = computed(() => !onboardingState.completed)
 
+const isIntroHidden = ref(localStorage.getItem('hide_dashboard_intro') === 'true')
+const showIntroDialog = ref(false)
+
+function hideIntro() {
+  showIntroDialog.value = true
+  isIntroHidden.value = true
+  localStorage.setItem('hide_dashboard_intro', 'true')
+  window.dispatchEvent(new CustomEvent('highlight-sidebar-intro'))
+}
+
 const recentSummary = computed(() => {
   if (stats.latestDraft) {
     return `有未完成练习：${stats.latestDraft.title}，可继续上次进度。`
@@ -273,6 +339,10 @@ function openVocabulary() {
   router.push('/exam/vocabulary')
 }
 
+function openIntro() {
+  router.push('/exam/intro')
+}
+
 function handleOnboardingDone(payload) {
   Object.assign(onboardingState, getOnboardingState())
   if (payload?.startPath) {
@@ -302,6 +372,13 @@ onUnmounted(() => {
 .dashboard-subtitle {
   margin-top: 6px;
   color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dashboard-helper {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
   line-height: 1.6;
 }
 
@@ -341,10 +418,194 @@ onUnmounted(() => {
   letter-spacing: -0.02em;
 }
 
+.intro-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+}
+
+.intro-entry-card h2 {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
 @media (max-width: 900px) {
-  .vocabulary-entry-card {
+  .vocabulary-entry-card,
+  .intro-entry-card {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* 弹窗遮罩 */
+.intro-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+/* 弹窗卡片 */
+.intro-modal-card {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  animation: slideUp 0.3s ease;
+}
+
+.intro-modal-card h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.intro-modal-card p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* 动画演示区域 */
+.demo-animation {
+  position: relative;
+  height: 120px;
+  background: #f4f6f8;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+/* 模拟侧边栏 */
+.mock-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 75px;
+  height: 100%;
+  background: white;
+  border-radius: 12px 0 0 12px;
+  padding: 12px 6px;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.03);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mock-section-label {
+  height: 3px;
+  background: #e2e8f0;
+  margin: 6px 2px 3px 2px;
+  border-radius: 1.5px;
+  width: 50%;
+}
+
+.mock-item {
+  height: 6px;
+  background: #edf2f7;
+  border-radius: 2px;
+  width: 80%;
+}
+
+.mock-item:nth-child(odd) {
+  width: 65%;
+}
+
+.mock-item.active {
+  height: 14px;
+  background: rgba(0, 102, 255, 0.05);
+  color: #0066ff;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 3px;
+  width: 95%;
+  border: 1px solid rgba(0, 102, 255, 0.1);
+  margin-top: 1px;
+}
+
+.mock-item.active svg {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+/* 模拟光标 */
+.mock-cursor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(0, 102, 255, 0.9);
+  border-radius: 50%;
+  top: 90px;
+  left: 140px;
+  animation: moveCursor 2.5s infinite ease-in-out;
+  box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.2);
+  z-index: 10;
+}
+
+@keyframes moveCursor {
+  0% {
+    top: 90px;
+    left: 140px;
+  }
+  50% {
+    top: 82px;
+    left: 30px;
+  }
+  65% {
+    top: 82px;
+    left: 30px;
+    transform: scale(0.8);
+    background: rgba(0, 102, 255, 1);
+  }
+  75% {
+    top: 82px;
+    left: 30px;
+    transform: scale(1);
+  }
+  100% {
+    top: 90px;
+    left: 140px;
+  }
+}
+
+/* 配合光标点击的目标项变色 */
+@keyframes itemHighlight {
+  0%, 45% { background: rgba(0, 102, 255, 0.05); }
+  65%, 75% { background: rgba(0, 102, 255, 0.15); }
+  100% { background: rgba(0, 102, 255, 0.05); }
+}
+
+.mock-item.active {
+  animation: itemHighlight 2.5s infinite ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 </style>

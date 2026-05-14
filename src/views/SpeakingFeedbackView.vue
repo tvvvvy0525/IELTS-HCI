@@ -67,6 +67,7 @@
         <div v-if="aiError" class="ai-error-box">
           ⚠️ {{ aiError }}
         </div>
+        <AiDisclaimer v-if="aiFeedback || isAiLoading || aiError" />
       </div>
 
       <!-- 四维评分 -->
@@ -145,20 +146,21 @@
         </div>
       </div>
 
-      <!-- 底部操作 -->
-      <div class="feedback-actions">
-        <RouterLink to="/exam/speaking" class="primary-btn">再练一次</RouterLink>
-        <RouterLink to="/exam/history" class="ghost-btn">查看历史</RouterLink>
-        <RouterLink to="/exam/dashboard" class="ghost-btn">返回首页</RouterLink>
-      </div>
+      <NextActionPanel
+        title="继续下一步"
+        description="可以继续做一轮口语练习，回看历史记录，或返回总览安排下一项任务。"
+        :actions="nextActions"
+      />
     </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { getExamHistory } from '../utils/examHistory.js'
+import AiDisclaimer from '../components/AiDisclaimer.vue'
+import NextActionPanel from '../components/NextActionPanel.vue'
 
 const route = useRoute()
 import { autoGradeSpeaking } from '../utils/speakingAiClient.js';
@@ -207,6 +209,12 @@ const asrProviderLabel = computed(() => {
 })
 
 const activeAnalysis = ref({})
+
+const nextActions = computed(() => ([
+  { label: '再练一套', variant: 'primary', to: '/exam/speaking' },
+  { label: '查看记录', variant: 'ghost', to: '/exam/history' },
+  { label: '进入下一科', variant: 'ghost', to: '/exam/dashboard' },
+]))
 
 function toggleAnalysis(key) {
   activeAnalysis.value[key] = !activeAnalysis.value[key]
