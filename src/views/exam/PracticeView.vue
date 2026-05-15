@@ -7,7 +7,7 @@
     </div>
 
     <div class="shell" @mousedown="onShellMouseDown" @dragstart="onDragStart" @dragend="onDragEnd" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop" @input="updateAnsweredStatus" @change="updateAnsweredStatus">
-      <section class="pane" id="left" @mouseup="onMouseUp" @click="onPaneClick">
+      <section class="pane" id="left" @mouseup="onMouseUp" @click="onPaneClick" @mousemove="handleMouseMove" @mouseleave="handleMouseLeave">
         <div class="passage-content" v-for="block in examData?.passage?.blocks" :key="block.blockId" v-html="block.html || block.bodyHtml"></div>
       </section>
 
@@ -133,6 +133,40 @@
       </footer>
     </div>
     <div class="overlay" v-if="notesVisible" @click="closeNote"></div>
+
+    <!-- 悬停取词加入生词本气泡 -->
+    <div 
+      v-if="showWordPopover" 
+      :style="popoverStyle" 
+      class="word-selector-popover"
+      style="max-width: 300px; font-family: inherit;"
+      @mouseenter="isMousingOverPopover = true"
+      @mouseleave="isMousingOverPopover = false; clearHoverState()"
+    >
+      <!-- 单词与词性 -->
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; border-bottom: 1px solid #475569; padding-bottom: 4px; gap: 12px;">
+        <strong style="font-size: 1.1rem; color: #f8fafc;">{{ selectedWord }}</strong>
+        <span v-if="aiWordInfo.pos" style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">{{ aiWordInfo.pos }}</span>
+      </div>
+      
+      <!-- 释义 -->
+      <p style="margin: 6px 0; font-size: 0.9rem; color: #cbd5e1; line-height: 1.4;">
+        {{ aiWordInfo.meaning }}
+      </p>
+      
+      <!-- 操作按钮 -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+        <button 
+          class="popover-btn" 
+          @click="addSelectedWordToNotebook"
+          :disabled="isAiLoading"
+          style="padding: 3px 8px; font-size: 0.8rem; background: #38bdf8; color: #0f172a; border-radius: 4px; font-weight: 600; cursor: pointer;"
+          :style="{ opacity: isAiLoading ? 0.6 : 1, cursor: isAiLoading ? 'not-allowed' : 'pointer' }"
+        >
+          <span style="margin-right: 2px;">+</span>加入生词本
+        </button>
+      </div>
+    </div>
   </div>
   <div class="loading" v-else>
     正在加载卷面数据...
@@ -141,6 +175,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
+import { vocabularyStore } from '../../utils/vocabularyStore.js'
+import { explainWordInContext } from '../../utils/writingAiClient.js'
 import { useRoute, useRouter } from 'vue-router'
 import NextActionPanel from '../../components/NextActionPanel.vue'
 import { saveExamRecord } from '../../utils/examHistory.js'
@@ -171,6 +207,17 @@ const mockMapping = {
 const DEFAULT_RESULT_PANEL_HEIGHT = 420
 const MIN_RESULT_PANEL_HEIGHT = 240
 const examData = ref(null)
+
+// 悬停取词相关状态
+const showWordPopover = ref(false)
+const popoverStyle = ref({ top: '0px', left: '0px' })
+const selectedWord = ref('')
+let hoverTimer = null
+let hideTimer = null
+const currentHoverWord = ref('')
+const isMousingOverPopover = ref(false)
+const aiWordInfo = ref({ pos: '', meaning: '', example: '' })
+const isAiLoading = ref(false)
 const loaded = ref(false)
 const isDark = ref(false)
 
@@ -626,6 +673,176 @@ const toggleOverride = (qId) => {
       answers: getReadingDraftSnapshot()
     });
   }
+}
+
+// === Word Hover Logic ===
+function handleMouseMove(e) {
+  if (!isSubmitted.value) return // 未提交时不能查词
+  if (isMousingOverPopover.value) return
+  
+  const result = extractWordAtPoint(e)
+  
+  if (result) {
+    clearTimeout(hideTimer)
+    const { word, range, sentence } = result
+    
+    if (word !== currentHoverWord.value) {
+      currentHoverWord.value = word
+      applyHighlight(range)
+      
+      clearTimeout(hoverTimer)
+      showWordPopover.value = false
+      
+      hoverTimer = setTimeout(async () => {
+        selectedWord.value = word
+        showPopoverAtRange(range)
+        
+        // 触发 AI 查词
+        isAiLoading.value = true
+        aiWordInfo.value = { pos: '', meaning: '正在通过 AI 解析语境释义...', example: '' }
+        try {
+          const info = await explainWordInContext(word, sentence)
+          aiWordInfo.value = info
+        } catch (err) {
+          aiWordInfo.value = { pos: '-', meaning: '解析失败: ' + err.message, example: '' }
+        } finally {
+          isAiLoading.value = false
+        }
+      }, 1000)
+    }
+  } else {
+    clearTimeout(hoverTimer)
+    
+    if (showWordPopover.value) {
+      clearTimeout(hideTimer)
+      hideTimer = setTimeout(() => {
+        if (!isMousingOverPopover.value) {
+          clearHoverState()
+        }
+      }, 300)
+    } else {
+      clearHoverState()
+    }
+  }
+}
+
+function handleMouseLeave() {
+  clearTimeout(hoverTimer)
+  if (showWordPopover.value) {
+    clearTimeout(hideTimer)
+    hideTimer = setTimeout(() => {
+      if (!isMousingOverPopover.value) {
+        clearHoverState()
+      }
+    }, 300)
+  } else {
+    clearHoverState()
+  }
+}
+
+function extractWordAtPoint(e) {
+  let range
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(e.clientX, e.clientY)
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY)
+    if (pos) {
+      range = document.createRange()
+      range.setStart(pos.offsetNode, pos.offset)
+      range.setEnd(pos.offsetNode, pos.offset)
+    }
+  }
+  
+  if (range && range.startContainer.nodeType === Node.TEXT_NODE) {
+    const textNode = range.startContainer
+    const offset = range.startOffset
+    const text = textNode.textContent
+    
+    let start = offset
+    while (start > 0 && /[a-zA-Z]/.test(text[start - 1])) {
+      start--
+    }
+    
+    let end = offset
+    while (end < text.length && /[a-zA-Z]/.test(text[end])) {
+      end++
+    }
+    
+    const word = text.slice(start, end).trim()
+    
+    if (word.length >= 2 && /^[a-zA-Z]+$/.test(word)) {
+      const wordRange = document.createRange()
+      wordRange.setStart(textNode, start)
+      wordRange.setEnd(textNode, end)
+      
+      // 提取句子
+      let sentenceStart = offset
+      while (sentenceStart > 0 && !/[.!?\n]/.test(text[sentenceStart - 1])) {
+        sentenceStart--
+      }
+      
+      let sentenceEnd = offset
+      while (sentenceEnd < text.length && !/[.!?\n]/.test(text[sentenceEnd])) {
+        sentenceEnd++
+      }
+      
+      const sentence = text.slice(sentenceStart, sentenceEnd).trim()
+      
+      return { word, range: wordRange, sentence }
+    }
+  }
+  return null
+}
+
+function applyHighlight(range) {
+  if (typeof CSS !== 'undefined' && CSS.highlights) {
+    const highlight = new Highlight(range)
+    CSS.highlights.set('word-hover', highlight)
+  }
+}
+
+function clearHoverState() {
+  currentHoverWord.value = ''
+  clearTimeout(hoverTimer)
+  showWordPopover.value = false
+  if (typeof CSS !== 'undefined' && CSS.highlights) {
+    CSS.highlights.delete('word-hover')
+  }
+}
+
+function showPopoverAtRange(range) {
+  const rect = range.getBoundingClientRect()
+  showWordPopover.value = true
+  popoverStyle.value = {
+    top: `${rect.top + window.scrollY - 36}px`,
+    left: `${rect.left + window.scrollX + rect.width / 2}px`,
+    transform: 'translateX(-50%)',
+    position: 'absolute',
+    zIndex: 10000
+  }
+}
+
+function addSelectedWordToNotebook() {
+  if (!selectedWord.value) return
+  
+  const cleanedWord = selectedWord.value.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '')
+  
+  if (!cleanedWord) {
+    alert('未选中有意义的单词！')
+    return
+  }
+  
+  vocabularyStore.addCustomWord({
+    word: cleanedWord,
+    pos: aiWordInfo.value.pos || 'n.',
+    meaning: aiWordInfo.value.meaning || '划词添加',
+    example: aiWordInfo.value.example || '',
+    topic: '阅读练习'
+  })
+  
+  alert(`已将 "${cleanedWord}" 加入生词本！`)
+  showWordPopover.value = false
+  window.getSelection().removeAllRanges()
 }
 
 // === Annotation Logic ===
@@ -1613,5 +1830,44 @@ const scrollToQuestion = (qId) => {
   margin: 0;
   cursor: pointer;
   transform: scale(1.15);
+}
+
+/* === Word Hover Styles === */
+::highlight(word-hover) {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
+.word-selector-popover {
+  position: absolute;
+  background: #1e293b;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  z-index: 10000;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.word-selector-popover::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0;
+  border-style: solid;
+  border-color: #1e293b transparent;
+  display: block;
+  width: 0;
+}
+
+.word-selector-popover .popover-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
 }
 </style>

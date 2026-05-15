@@ -161,8 +161,7 @@ export async function explainWordInContext(word, sentence) {
 请直接返回 JSON 格式的数据，务必不要包含任何 Markdown 代码块包裹（如 \`\`\`json），也不要输出任何解释性文字。必须是纯 JSON。格式如下：
 {
   "pos": "词性（如 n. / v. / adj. 等）",
-  "meaning": "在当前语境下的中文释义",
-  "example": "包含该单词的另一个例句（最好适合雅思备考）"
+  "meaning": "在当前语境下的中文释义（10字以内，简洁精准）"
 }`;
 
   try {
@@ -171,7 +170,10 @@ export async function explainWordInContext(word, sentence) {
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```json\s*|^\`\`\`\s*|```$/g, '').trim();
     }
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+    // 直接使用原文句子作为例句，而非 AI 重新造句
+    parsed.example = sentence;
+    return parsed;
   } catch (err) {
     throw createAiError('GENERATION_ERROR', '词义解析失败: ' + err.message);
   }
