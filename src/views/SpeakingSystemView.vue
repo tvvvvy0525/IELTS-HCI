@@ -5,7 +5,7 @@
       <div class="hero-left">
         <p class="eyebrow">Speaking</p>
         <h2>口语练习</h2>
-        <p class="hero-desc">选择一个 Part 开始练习。完成录音后，系统会根据你的回答给出评分和建议。</p>
+        <p class="hero-desc">选择一个 Part 和题目开始练习。完成录音后，系统会根据你的回答给出评分和建议。</p>
 
         <!-- ASR 状态条 -->
         <div class="asr-status" :class="asrStatusClass">
@@ -63,39 +63,50 @@
       <div class="topic-header">
         <div>
           <h3>选择话题</h3>
-          <p class="topic-desc">先选一个你愿意开口的主题；如果拿不准，也可以直接随机抽题。</p>
+          <p class="topic-desc">现在按列表选题，先看标题和预览，再决定从哪道题开始；拿不准也可以随机抽题。</p>
         </div>
         <button class="ghost-btn" @click="randomTopic" type="button">🎲 随机话题</button>
       </div>
+      <div class="topic-summary">
+        当前共有 <strong>{{ topicList.length }}</strong> 道可选题目
+      </div>
       <div class="topic-list">
-        <button
+        <div
           v-for="topic in topicList"
           :key="topic.id"
-          class="topic-btn"
+          class="topic-row"
           :class="{ active: selectedTopicId === topic.id }"
-          type="button"
           @click="selectedTopicId = topic.id"
+          @keydown.enter="selectedTopicId = topic.id"
+          @keydown.space.prevent="selectedTopicId = topic.id"
+          role="button"
+          tabindex="0"
         >
-          {{ topic.title }}
-        </button>
+          <div class="topic-row-main">
+            <div class="topic-row-head">
+              <strong>{{ topic.title }}</strong>
+              <span class="topic-count">{{ topic.questionCount }} 题</span>
+            </div>
+            <p class="topic-row-subtitle">{{ topic.subtitle }}</p>
+            <ul class="topic-preview">
+              <li v-for="(line, index) in topic.preview" :key="`${topic.id}-${index}`">{{ line }}</li>
+            </ul>
+          </div>
+          <button
+            class="topic-start-btn"
+            type="button"
+            @click.stop="startPractice(topic.id)"
+          >
+            开始练习
+          </button>
+        </div>
       </div>
     </section>
-
-    <!-- 开始按钮 -->
-    <div class="start-action">
-      <button class="primary-btn start-btn" type="button" @click="startPractice">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
-        开始 {{ selectedPart }} 练习
-      </button>
-      <span class="start-hint">开始后会进入录音页面；练习完成后会自动保存并生成反馈。</span>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTopicList, getRandomTopic } from '../utils/speakingPractice.js'
 import { getSpeakingSettings } from '../utils/speakingSettings.js'
@@ -135,10 +146,14 @@ const selectedTopicId = ref('')
 const asrStatusText = ref('检测语音服务中...')
 const asrStatusClass = ref('checking')
 
-onMounted(async () => {
-  const topics = getTopicList()
+function syncTopicList() {
+  const topics = getTopicList(selectedPart.value)
   topicList.value = topics
   selectedTopicId.value = topics[0]?.id || ''
+}
+
+onMounted(async () => {
+  syncTopicList()
 
   // 检测 ASR 可用状态
   const settings = getSpeakingSettings()
@@ -157,17 +172,21 @@ onMounted(async () => {
   }
 })
 
+watch(selectedPart, () => {
+  syncTopicList()
+})
+
 function randomTopic() {
-  const topic = getRandomTopic()
+  const topic = getRandomTopic(selectedPart.value)
   selectedTopicId.value = topic.id
 }
 
-function startPractice() {
+function startPractice(topicId = selectedTopicId.value) {
   router.push({
     path: '/exam/speaking/practice',
     query: {
       part: selectedPart.value,
-      topicId: selectedTopicId.value,
+      topicId,
     },
   })
 }
@@ -339,52 +358,111 @@ function startPractice() {
 .topic-header h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
 .topic-desc { font-size: 0.82rem; color: var(--text-muted); }
 
+.topic-summary {
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
 .topic-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.topic-btn {
-  padding: 6px 14px;
-  border-radius: 8px;
+.topic-row {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
   border: 1.5px solid var(--border);
   background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 0.82rem;
+  color: inherit;
   cursor: pointer;
-  font-weight: 600;
-  transition: all 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.topic-btn:hover {
+.topic-row:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  transform: translateY(-1px);
 }
 
-.topic-btn.active {
+.topic-row.active {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb, 99,102,241), 0.08);
+}
+
+.topic-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.topic-row-head strong {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.topic-count {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--accent);
 }
 
-.start-action {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.start-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 28px;
-  font-size: 0.95rem;
-}
-
-.start-hint {
+.topic-row-subtitle {
+  margin: 0 0 8px;
   font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.topic-preview {
+  margin: 0;
+  padding-left: 18px;
   color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.topic-start-btn {
+  flex-shrink: 0;
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topic-start-btn:hover {
+  filter: brightness(0.96);
+}
+
+@media (max-width: 860px) {
+  .topic-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topic-start-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

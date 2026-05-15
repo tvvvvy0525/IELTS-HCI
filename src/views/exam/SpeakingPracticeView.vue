@@ -10,7 +10,7 @@
       </button>
       <div class="topbar-center">
         <span class="part-badge">{{ part }}</span>
-        <span class="topic-name">{{ currentTopic?.part1?.topic || '' }}</span>
+        <span class="topic-name">{{ topicDisplayName }}</span>
       </div>
       <!-- ASR 层级指示器 -->
       <div class="asr-indicator" :class="asrProviderClass">
@@ -368,6 +368,9 @@ const prepDashOffset = computed(() => {
 // 问答状态
 const currentQuestionIndex = ref(0)
 const questions = ref([])
+const topicDisplayName = computed(() => {
+  return currentTopic.value?.title || currentTopic.value?.part1?.topic || currentTopic.value?.part2?.topic || ''
+})
 
 // 监听题目切换，如果是听题模式则自动朗读
 watch(currentQuestionIndex, (newIdx) => {
@@ -600,7 +603,7 @@ async function finishPractice() {
   const record = {
     subject: 'speaking',
     examId: session.value.sessionId,
-    title: `Speaking ${part} · ${currentTopic.value.part1.topic}`,
+    title: `Speaking ${part} · ${topicDisplayName.value}`,
     part: part,
     score: feedback.overallBand,
     maxScore: 9,
@@ -690,7 +693,7 @@ function exitPractice() {
 }
 
 onMounted(() => {
-  const topic = getTopicById(topicId)
+  const topic = getTopicById(topicId, part)
   currentTopic.value = topic
   session.value = createSpeakingSession({ part, topicId: topic.id })
 
